@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: automated-parking-system
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/automated_parking}
+    username: ${DB_USERNAME:parking}
+    password: ${DB_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    url: /openapi.yaml
+    disable-swagger-default-url: true
+
+app:
+  security:
+    gate-api-key: ${GATE_API_KEY}
+    jwt-secret: ${JWT_SECRET}
+    jwt-expiration-seconds: ${JWT_EXPIRATION_SECONDS:3600}
+  admin-bootstrap:
+    username: ${ADMIN_BOOTSTRAP_USERNAME:}
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}

@@ -1,0 +1,780 @@
+openapi: 3.0.3
+info:
+  title: Automated Parking System — REST API
+  version: 1.0.0
+  description: |
+    Đặc tả API Pha 1 cho đồ án Kiến trúc phần mềm. Gate Simulator mô phỏng sự kiện xe vào/ra; Admin
+    theo dõi phiên và quản lý bảo trì. Không có User/Staff, thanh toán, đặt chỗ trước hoặc phần cứng thật.
+
+    ## Quy ước
+    - Admin: JWT Bearer; Gate Simulator: `X-Gate-Api-Key`.
+    - Các biển số được chuẩn hóa (bỏ khoảng trắng thừa, viết hoa) trước khi đối chiếu.
+    - Timestamps theo ISO 8601 (UTC trong ví dụ).
+    - `ParkingSpot.status` (`AVAILABLE`/`OCCUPIED`) khác `inMaintenance` (true/false).
+    - `eventId` là mã duy nhất toàn hệ thống cổng, dùng để chống xử lý lặp. Gửi lại cùng eventId và cùng
+      dữ liệu trả về quyết định cũ, không thay đổi dữ liệu thêm lần nào. Cùng eventId nhưng dữ liệu khác trả
+      `409 EVENT_ID_REUSED`.
+    - `GateEvent` và thay đổi ParkingSession/ParkingSpot cần được lưu nhất quán bằng transaction. Không được
+      tạo hai phiên `ACTIVE` cho cùng biển số hoặc cùng chỗ đỗ.
+    - Các giá trị mã lỗi, giới hạn phân trang và cách chuẩn hóa biển số trong tài liệu này là đề xuất kỹ
+      thuật để nhóm thống nhất khi triển khai.
+servers:
+  - url: http://localhost:8080
+    description: Backend chạy trên máy phát triển
+tags:
+  - name: Authentication
+    description: Đăng nhập quản trị viên.
+  - name: Gate
+    description: Nhận sự kiện tự động từ cổng mô phỏng.
+  - name: Parking Spots
+    description: Theo dõi chỗ và xử lý bảo trì.
+  - name: Parking Sessions
+    description: Tra cứu các lượt gửi xe.
+paths:
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Admin đăng nhập
+      description: Tài khoản Admin được cấu hình/tạo sẵn, không có API đăng ký. Mật khẩu sai trả 401.
+      operationId: adminLogin
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              username: admin
+              password: YourStrongPassword
+      responses:
+        '200':
+          description: Đăng nhập thành công; trả JWT.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+              example:
+                accessToken: eyJhbGciOi...
+                tokenType: Bearer
+                expiresIn: 3600
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Chưa xác thực hoặc thông tin xác thực không hợp lệ.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                INVALID_CREDENTIALS:
+                  summary: Tên đăng nhập hoặc mật khẩu không đúng.
+                  value:
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Tên đăng nhập hoặc mật khẩu không đúng.
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [VALIDATION_ERROR, INVALID_CREDENTIALS]
+  /api/v1/gates/entry:
+    post:
+      tags: [Gate]
+      summary: Xe vào bãi — check-in tự động
+      description: >-
+        Nhận một sự kiện ENTRY, kiểm tra biển số chưa có phiên ACTIVE, tìm chỗ AVAILABLE đúng loại xe và
+        không bảo trì; tạo ParkingSession ACTIVE, cập nhật ParkingSpot OCCUPIED và ghi GateEvent trong cùng
+        transaction. Nếu không thể cấp chỗ, trả 409. Sự kiện đã xử lý mà được gửi lại cùng eventId và
+        payload phải trả lại cùng kết quả; eventId trùng với payload khác trả 409 EVENT_ID_REUSED.
+      operationId: gateEntry
+      security:
+        - GateApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntryRequest'
+            example:
+              eventId: evt-001
+              gateId: IN-01
+              licensePlate: 29A-12345
+              vehicleType: MOTORBIKE
+      responses:
+        '201':
+          description: Đã tạo phiên gửi xe và cấp chỗ. Retry cùng eventId trả kết quả tương đương.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryResponse'
+              example:
+                status: ACCEPTED
+                sessionId: 101
+                assignedSpot: A05
+          headers:
+            X-Event-Replayed:
+              description: true nếu request là lần gửi lại của eventId đã hoàn tất.
+              schema:
+                type: boolean
+              example: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Yêu cầu không thể thực hiện vì vi phạm trạng thái/quy tắc nghiệp vụ.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                VEHICLE_ALREADY_PARKED:
+                  summary: Xe này đã có phiên gửi xe đang hoạt động.
+                  value:
+                    error:
+                      code: VEHICLE_ALREADY_PARKED
+                      message: Xe này đã có phiên gửi xe đang hoạt động.
+                NO_AVAILABLE_SPOT:
+                  summary: Không còn chỗ phù hợp với loại xe.
+                  value:
+                    error:
+                      code: NO_AVAILABLE_SPOT
+                      message: Không còn chỗ phù hợp với loại xe.
+                EVENT_ID_REUSED:
+                  summary: eventId đã được dùng với dữ liệu khác.
+                  value:
+                    error:
+                      code: EVENT_ID_REUSED
+                      message: eventId đã được dùng với dữ liệu khác.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      x-error-codes: [VALIDATION_ERROR, VEHICLE_ALREADY_PARKED, NO_AVAILABLE_SPOT, EVENT_ID_REUSED]
+  /api/v1/gates/exit:
+    post:
+      tags: [Gate]
+      summary: Xe ra bãi — checkout tự động
+      description: >-
+        Nhận sự kiện EXIT, tìm phiên ACTIVE theo biển số, ghi thời gian ra, chuyển phiên COMPLETED và đưa
+        chỗ về AVAILABLE trong một transaction. Sự kiện retry cùng eventId+payload nhận lại kết quả cũ.
+        Không có phiên ACTIVE trả 409 NO_ACTIVE_SESSION.
+      operationId: gateExit
+      security:
+        - GateApiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExitRequest'
+            example:
+              eventId: evt-002
+              gateId: OUT-01
+              licensePlate: 29A-12345
+      responses:
+        '200':
+          description: Đã hoàn tất phiên và giải phóng chỗ. Retry cùng sự kiện giữ nguyên kết quả.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExitResponse'
+              example:
+                status: ACCEPTED
+                sessionId: 101
+                releasedSpot: A05
+          headers:
+            X-Event-Replayed:
+              description: true nếu request là lần gửi lại của eventId đã hoàn tất.
+              schema:
+                type: boolean
+              example: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: Yêu cầu không thể thực hiện vì vi phạm trạng thái/quy tắc nghiệp vụ.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                NO_ACTIVE_SESSION:
+                  summary: Không có phiên gửi xe đang hoạt động cho biển số này.
+                  value:
+                    error:
+                      code: NO_ACTIVE_SESSION
+                      message: Không có phiên gửi xe đang hoạt động cho biển số này.
+                EVENT_ID_REUSED:
+                  summary: eventId đã được dùng với dữ liệu khác.
+                  value:
+                    error:
+                      code: EVENT_ID_REUSED
+                      message: eventId đã được dùng với dữ liệu khác.
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+      x-error-codes: [VALIDATION_ERROR, NO_ACTIVE_SESSION, EVENT_ID_REUSED]
+  /api/v1/parking-spots:
+    get:
+      tags: [Parking Spots]
+      summary: Xem và lọc danh sách chỗ đỗ
+      description: >-
+        Chỉ dành cho Admin. Danh sách chỗ cố định đã được khởi tạo trong hệ thống. Hai trường status và
+        inMaintenance độc lập. Kết quả sắp xếp theo code tăng dần.
+      operationId: listParkingSpots
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Lọc theo trạng thái chiếm dụng.
+          schema:
+            $ref: '#/components/schemas/ParkingSpotStatus'
+        - name: vehicleType
+          in: query
+          required: false
+          description: Lọc theo loại xe.
+          schema:
+            $ref: '#/components/schemas/VehicleType'
+        - name: inMaintenance
+          in: query
+          required: false
+          description: Lọc theo tình trạng bảo trì.
+          schema:
+            type: boolean
+        - name: page
+          in: query
+          required: false
+          description: Trang bắt đầu từ 0.
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          description: Số bản ghi mỗi trang; tối đa 100.
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Danh sách chỗ đỗ có phân trang.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParkingSpotPage'
+              example:
+                items:
+                  - id: 12
+                    code: A05
+                    vehicleType: MOTORBIKE
+                    status: AVAILABLE
+                    inMaintenance: false
+                page:
+                  page: 0
+                  size: 20
+                  totalElements: 1
+                  totalPages: 1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [VALIDATION_ERROR]
+  /api/v1/parking-spots/{id}/maintenance:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: ID của chỗ đỗ.
+        schema:
+          type: integer
+          format: int64
+          minimum: 1
+        example: 12
+    post:
+      tags: [Parking Spots]
+      summary: Tạm ngừng chỗ đỗ để bảo trì
+      description: >-
+        Không cần request body. Chỉ được đưa chỗ vào bảo trì nếu chỗ đang AVAILABLE và chưa bảo trì.
+        Cập nhật phải chống tranh chấp với nghiệp vụ phân bổ chỗ check-in.
+      operationId: startSpotMaintenance
+      security:
+        - AdminBearer: []
+      responses:
+        '201':
+          description: Chỗ đỗ được đưa vào bảo trì (inMaintenance=true).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParkingSpot'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [SPOT_NOT_FOUND, SPOT_OCCUPIED, ALREADY_IN_MAINTENANCE]
+    delete:
+      tags: [Parking Spots]
+      summary: Kết thúc bảo trì và mở lại chỗ
+      description: >-
+        Xóa trạng thái bảo trì, không xóa chỗ đỗ. Nếu chỗ đã không còn bảo trì, tiếp tục trả 204 để an
+        toàn khi Admin gửi lại request.
+      operationId: endSpotMaintenance
+      security:
+        - AdminBearer: []
+      responses:
+        '204':
+          description: Đã kết thúc bảo trì (hoặc chỗ vốn đã không bảo trì).
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [SPOT_NOT_FOUND]
+  /api/v1/parking-sessions:
+    get:
+      tags: [Parking Sessions]
+      summary: Xem và lọc các phiên gửi xe
+      description: >-
+        Admin tra cứu phiên hiện tại và lịch sử qua một endpoint. Dùng status=ACTIVE để xem xe đang trong
+        bãi. Hai mốc from/to áp dụng cho checkInAt; from phải nhỏ hơn hoặc bằng to. Kết quả mặc định sắp
+        theo checkInAt giảm dần, sau đó id giảm dần.
+      operationId: listParkingSessions
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ParkingSessionStatus'
+        - name: licensePlate
+          in: query
+          required: false
+          description: Lọc theo biển số sau khi chuẩn hóa.
+          schema:
+            type: string
+        - name: from
+          in: query
+          required: false
+          description: Lọc checkInAt từ thời điểm này (bao gồm).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Lọc checkInAt đến thời điểm này (bao gồm).
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: size
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Danh sách phiên gửi xe có phân trang.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParkingSessionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [VALIDATION_ERROR]
+  /api/v1/parking-sessions/{id}:
+    get:
+      tags: [Parking Sessions]
+      summary: Xem chi tiết một phiên gửi xe
+      description: Tra cứu phiên theo id. Nếu đang ACTIVE thì checkOutAt = null.
+      operationId: getParkingSession
+      security:
+        - AdminBearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID của phiên gửi xe.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+          example: 101
+      responses:
+        '200':
+          description: Chi tiết một phiên gửi xe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParkingSession'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+      x-error-codes: [SESSION_NOT_FOUND]
+components:
+  securitySchemes:
+    AdminBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT nhận từ POST /api/v1/auth/login; chỉ dành cho Admin.
+    GateApiKey:
+      type: apiKey
+      in: header
+      name: X-Gate-Api-Key
+      description: API key của Gate Simulator được thiết lập trong cấu hình backend.
+  schemas:
+    VehicleType:
+      type: string
+      description: Loại phương tiện.
+      enum: [MOTORBIKE, CAR]
+      example: MOTORBIKE
+    ParkingSpotStatus:
+      type: string
+      description: Trạng thái sử dụng chỗ đỗ.
+      enum: [AVAILABLE, OCCUPIED]
+      example: AVAILABLE
+    ParkingSessionStatus:
+      type: string
+      enum: [ACTIVE, COMPLETED]
+      example: ACTIVE
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: admin
+        password:
+          type: string
+          format: password
+          minLength: 1
+          example: YourStrongPassword
+    LoginResponse:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: JWT dùng cho API Admin.
+          example: eyJhbGciOi...
+        tokenType:
+          type: string
+          enum: [Bearer]
+          example: Bearer
+        expiresIn:
+          type: integer
+          description: Số giây còn hiệu lực của token.
+          minimum: 1
+          example: 3600
+    EntryRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId, gateId, licensePlate, vehicleType]
+      properties:
+        eventId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Mã duy nhất của sự kiện; giữ nguyên khi retry.
+          example: evt-001
+        gateId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Mã cổng phát sự kiện.
+          example: IN-01
+        licensePlate:
+          type: string
+          minLength: 4
+          maxLength: 20
+          description: Biển số do Gate Simulator cung cấp; backend chuẩn hóa trước khi đối chiếu.
+          example: 29A-12345
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+    ExitRequest:
+      type: object
+      additionalProperties: false
+      required: [eventId, gateId, licensePlate]
+      properties:
+        eventId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: evt-002
+        gateId:
+          type: string
+          minLength: 1
+          maxLength: 64
+          example: OUT-01
+        licensePlate:
+          type: string
+          minLength: 4
+          maxLength: 20
+          example: 29A-12345
+    EntryResponse:
+      type: object
+      required: [status, sessionId, assignedSpot]
+      properties:
+        status:
+          type: string
+          enum: [ACCEPTED]
+          example: ACCEPTED
+        sessionId:
+          type: integer
+          format: int64
+          example: 101
+        assignedSpot:
+          type: string
+          description: Mã chỗ đỗ được hệ thống phân bổ.
+          example: A05
+    ExitResponse:
+      type: object
+      required: [status, sessionId, releasedSpot]
+      properties:
+        status:
+          type: string
+          enum: [ACCEPTED]
+          example: ACCEPTED
+        sessionId:
+          type: integer
+          format: int64
+          example: 101
+        releasedSpot:
+          type: string
+          example: A05
+    ParkingSpot:
+      type: object
+      required: [id, code, vehicleType, status, inMaintenance]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 12
+        code:
+          type: string
+          example: A05
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+        status:
+          $ref: '#/components/schemas/ParkingSpotStatus'
+        inMaintenance:
+          type: boolean
+          description: true nếu chỗ không được nhận xe mới do bảo trì.
+          example: false
+    ParkingSession:
+      type: object
+      required: [id, licensePlate, vehicleType, spotId, spotCode, checkInAt, checkOutAt, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 101
+        licensePlate:
+          type: string
+          example: 29A-12345
+        vehicleType:
+          $ref: '#/components/schemas/VehicleType'
+        spotId:
+          type: integer
+          format: int64
+          example: 12
+        spotCode:
+          type: string
+          example: A05
+        checkInAt:
+          type: string
+          format: date-time
+          description: Thời gian xe vào (backend ghi nhận).
+          example: '2026-10-19T08:00:00Z'
+        checkOutAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: null nếu phiên còn ACTIVE.
+          example: null
+        status:
+          $ref: '#/components/schemas/ParkingSessionStatus'
+    PageMeta:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page:
+          type: integer
+          minimum: 0
+          example: 0
+        size:
+          type: integer
+          minimum: 1
+          example: 20
+        totalElements:
+          type: integer
+          minimum: 0
+          example: 100
+        totalPages:
+          type: integer
+          minimum: 0
+          example: 5
+    ParkingSpotPage:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSpot'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+    ParkingSessionPage:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParkingSession'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Mã lỗi ổn định cho phía gọi API.
+          example: NO_AVAILABLE_SPOT
+        message:
+          type: string
+          description: Thông báo có thể đọc được.
+          example: Không còn chỗ đỗ phù hợp.
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Thông tin phụ để hỗ trợ kiểm tra lỗi.
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: '#/components/schemas/ApiError'
+  responses:
+    BadRequest:
+      description: Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ.
+    Unauthorized:
+      description: Chưa xác thực hoặc thông tin xác thực không hợp lệ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Chưa xác thực hoặc thông tin xác thực không hợp lệ.
+    Forbidden:
+      description: Đã xác thực nhưng không có quyền sử dụng API.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: FORBIDDEN
+              message: Đã xác thực nhưng không có quyền sử dụng API.
+    NotFound:
+      description: Không tìm thấy tài nguyên được yêu cầu.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RESOURCE_NOT_FOUND
+              message: Không tìm thấy tài nguyên được yêu cầu.
+    Conflict:
+      description: Yêu cầu không thể thực hiện vì vi phạm trạng thái/quy tắc nghiệp vụ.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: BUSINESS_CONFLICT
+              message: Yêu cầu không thể thực hiện vì vi phạm trạng thái/quy tắc nghiệp vụ.
+    InternalError:
+      description: Lỗi bất ngờ phía máy chủ; không tiết lộ thông tin nhạy cảm.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Lỗi bất ngờ phía máy chủ; không tiết lộ thông tin nhạy cảm.
+    ServiceUnavailable:
+      description: Hệ thống tạm thời không thể xử lý; phía gọi có thể thử lại.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: Hệ thống tạm thời không thể xử lý; phía gọi có thể thử lại.
