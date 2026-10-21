@@ -212,16 +212,16 @@ public record GateResult(GateDecision decision, boolean replayed) {}
 
 ### 7.2. Repository contract mục tiêu — Member 2 triển khai
 
+Baseline đã có các repository CRUD dùng cho scaffold. Workflow ENTRY/EXIT dùng các port riêng để không buộc adapter hiện tại giả lập locking bằng `findAll`/`save`:
+
 ```java
-public interface ParkingSpotRepository {
-    Optional<ParkingSpot> findById(Long id);
+public interface ParkingSpotWorkflowRepository {
     Optional<ParkingSpot> lockFirstAvailable(VehicleType vehicleType);
     boolean markOccupied(Long spotId);
     boolean markAvailable(Long spotId);
 }
 
-public interface ParkingSessionRepository {
-    Optional<ParkingSession> findById(Long id);
+public interface ParkingSessionWorkflowRepository {
     boolean existsActiveByLicensePlate(String licensePlateKey);
     Optional<ParkingSession> lockActiveByLicensePlate(String licensePlateKey);
     ParkingSession createActive(
@@ -245,7 +245,7 @@ Các query phân trang của Admin nên dùng port riêng do Member 2 và 3 th�
 ### 7.3. Event replay contract
 
 ```java
-public interface GateEventRepository {
+public interface GateEventWorkflowRepository {
     EventStart beginOrReplay(
             String eventId,
             GateEventType eventType,
