@@ -1,6 +1,6 @@
 # Automated Parking System
 
-Backend nền tảng cho đồ án quản lý bãi đỗ xe tự động. Gate Simulator sẽ gửi sự kiện xe vào/ra; Admin theo dõi phiên gửi xe, trạng thái chỗ và bảo trì. Phase 1 chỉ dựng nền tảng kỹ thuật, schema và security; chưa triển khai nghiệp vụ check-in, checkout hay thuật toán phân bổ chỗ.
+Backend cho đồ án quản lý bãi đỗ xe tự động. Gate Simulator sẽ gửi sự kiện xe vào/ra; Admin theo dõi phiên gửi xe, trạng thái chỗ và bảo trì. Nền tảng kỹ thuật đã hoàn thành; Business Layer cho check-in, checkout, phân bổ chỗ, validation và event replay đã có dưới dạng Java thuần. Các workflow này chưa được nối với REST API hoặc PostgreSQL cho đến khi phần việc Member 2 và Member 3 được tích hợp.
 
 Tài liệu phân công, contract giữa các tầng và Definition of Done cho giai đoạn triển khai tiếp theo nằm tại [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md). Mọi thành viên cần đọc tài liệu này và OpenAPI trước khi tạo nhánh feature.
 
@@ -101,15 +101,18 @@ Business Layer không phụ thuộc Spring MVC, Spring Data JPA, Hibernate hoặ
 - Security nền tảng: API key cho `/api/v1/gates/**`, JWT role `ADMIN` cho API quản trị.
 - Swagger UI đọc trực tiếp file OpenAPI đã thống nhất.
 - Unit test, integration test Testcontainers, migration/context/health test, Docker Compose và CI.
+- Business workflow của Member 1: check-in, checkout, phân bổ chỗ qua locking port, validation, request hash và event replay.
+- Unit test Business dùng mock port, `Clock` cố định và không phụ thuộc Spring/JPA.
 
-## Chưa triển khai trong Phase 1
+## Chưa tích hợp
 
 - Controller và xử lý `POST /api/v1/auth/login`.
-- Check-in, checkout, chống xử lý lặp `eventId` và thuật toán phân bổ chỗ.
+- Adapter PostgreSQL cho các workflow port, transaction/locking thật và migration `license_plate_key`.
+- Wiring Business Service vào controller và persistence adapter.
 - API tra cứu, phân trang và quản lý bảo trì.
-- Cơ chế phát hành JWT. Cấu hình hiện tại mới xác minh JWT HMAC do Phase 2 cung cấp.
+- Cơ chế phát hành JWT. Cấu hình hiện tại mới xác minh JWT HMAC; Member 3 sẽ cung cấp luồng đăng nhập và phát hành token.
 
-Các endpoint nghiệp vụ trong OpenAPI vì vậy chưa trả dữ liệu giả. Nhóm tiếp tục code đúng contract tại `openapi.yaml`.
+Các endpoint nghiệp vụ trong OpenAPI chưa hoạt động cho đến khi hoàn thành integration. Nhóm tiếp tục code đúng contract tại `openapi.yaml` và `docs/TEAM_HANDOFF.md`.
 
 ## Phân chia tham khảo
 
