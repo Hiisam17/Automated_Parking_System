@@ -19,6 +19,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -59,7 +60,7 @@ class CheckOutServiceTest {
                 sessionRepository,
                 eventRepository,
                 unitOfWork,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneId.of("Asia/Ho_Chi_Minh"))
         );
     }
 
@@ -171,6 +172,16 @@ class CheckOutServiceTest {
         )).isInstanceOfSatisfying(BusinessException.class, exception ->
                 assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR")
         );
+
+        verifyNoInteractions(unitOfWork, eventRepository, sessionRepository, spotRepository);
+    }
+
+    @Test
+    void shouldRejectLicensePlateWithoutAlphanumericCharacters() {
+        assertThatThrownBy(() -> service.checkOut(command("evt-exit-008", "----")))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR")
+                );
 
         verifyNoInteractions(unitOfWork, eventRepository, sessionRepository, spotRepository);
     }

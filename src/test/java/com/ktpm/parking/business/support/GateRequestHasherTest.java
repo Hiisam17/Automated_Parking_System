@@ -23,4 +23,20 @@ class GateRequestHasherTest {
 
         assertThat(entry).isNotEqualTo(otherVehicleType).isNotEqualTo(exit);
     }
+
+    @Test
+    void shouldHashEquivalentLicensePlateFormatsIdentically() {
+        String withHyphen = GateRequestHasher.forEntry(
+                "IN-01",
+                LicensePlateNormalizer.toKey("29A-12345"),
+                VehicleType.MOTORBIKE
+        );
+        String withSpace = GateRequestHasher.forEntry(
+                "IN-01",
+                LicensePlateNormalizer.toKey("29a 12345"),
+                VehicleType.MOTORBIKE
+        );
+
+        assertThat(withHyphen).isEqualTo(withSpace);
+    }
 }

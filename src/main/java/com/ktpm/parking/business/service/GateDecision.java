@@ -18,8 +18,14 @@ public record GateDecision(
         if (accepted && (sessionId == null || spotCode == null || spotCode.isBlank())) {
             throw new IllegalArgumentException("Accepted decision requires sessionId and spotCode");
         }
+        if (accepted && !ACCEPTED.equals(code)) {
+            throw new IllegalArgumentException("Accepted decision must use ACCEPTED code");
+        }
         if (!accepted && (sessionId != null || spotCode != null)) {
             throw new IllegalArgumentException("Rejected decision must not contain session or spot");
+        }
+        if (!accepted && ACCEPTED.equals(code)) {
+            throw new IllegalArgumentException("Rejected decision must not use ACCEPTED code");
         }
     }
 

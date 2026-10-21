@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -60,7 +61,7 @@ class CheckInServiceTest {
                 sessionRepository,
                 eventRepository,
                 unitOfWork,
-                Clock.fixed(NOW, ZoneOffset.UTC)
+                Clock.fixed(NOW, ZoneId.of("Asia/Ho_Chi_Minh"))
         );
     }
 
@@ -194,6 +195,28 @@ class CheckInServiceTest {
         );
 
         verifyNoInteractions(unitOfWork, eventRepository, sessionRepository, spotRepository);
+    }
+
+    @Test
+    void shouldRejectLicensePlateWithoutAlphanumericCharacters() {
+        assertThatThrownBy(() -> service.checkIn(command("evt-008", "----")))
+                .isInstanceOfSatisfying(BusinessException.class, exception ->
+                        assertThat(exception.getCode()).isEqualTo("VALIDATION_ERROR")
+                );
+
+        verifyNoInteractions(unitOfWork, eventRepository, sessionRepository, spotRepository);
+    }
+
+    @Test
+    void shouldFailFastWhenEventRepositoryReturnsNoState() {
+        executeSynchronously();
+        when(eventRepository.beginOrReplay(anyString(), any(), anyString())).thenReturn(null);
+
+        assertThatThrownBy(() -> service.checkIn(command("evt-009", "29A-12345")))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("event repository");
+
+        verifyNoInteractions(sessionRepository, spotRepository);
     }
 
     @Test

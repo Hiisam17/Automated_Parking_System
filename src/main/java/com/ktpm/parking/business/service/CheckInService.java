@@ -15,6 +15,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class CheckInService {
 
@@ -43,6 +44,7 @@ public final class CheckInService {
 
         String displayPlate = LicensePlateNormalizer.normalizeForDisplay(command.licensePlate());
         String licensePlateKey = LicensePlateNormalizer.toKey(command.licensePlate());
+        GateCommandValidator.validateLicensePlateKey(licensePlateKey);
         String requestHash = GateRequestHasher.forEntry(
                 command.gateId(),
                 licensePlateKey,
@@ -63,11 +65,11 @@ public final class CheckInService {
             String licensePlateKey,
             String requestHash
     ) {
-        EventStart eventStart = eventRepository.beginOrReplay(
+        EventStart eventStart = Objects.requireNonNull(eventRepository.beginOrReplay(
                 command.eventId(),
                 GateEventType.ENTRY,
                 requestHash
-        );
+        ), "event repository must return an event state");
 
         if (eventStart instanceof EventStart.Replay replay) {
             return GateResult.replay(replay.previous());
@@ -80,11 +82,11 @@ public final class CheckInService {
             return rejectAndSave(command.eventId(), ParkingError.VEHICLE_ALREADY_PARKED);
         }
 
-        ParkingSpot spot = spotRepository.lockFirstAvailable(command.vehicleType())
-                .orElse(null);
-        if (spot == null) {
+        Optional<ParkingSpot> availableSpot = spotRepository.lockFirstAvailable(command.vehicleType());
+        if (availableSpot.isEmpty()) {
             return rejectAndSave(command.eventId(), ParkingError.NO_AVAILABLE_SPOT);
         }
+        ParkingSpot spot = availableSpot.get();
 
         if (!spotRepository.markOccupied(spot.id())) {
             throw new IllegalStateException("Locked parking spot could not be marked occupied");

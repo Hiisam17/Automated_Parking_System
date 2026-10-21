@@ -29,6 +29,15 @@ final class GateCommandValidator {
         validateCommon(command.eventId(), command.gateId(), command.licensePlate());
     }
 
+    static void validateLicensePlateKey(String licensePlateKey) {
+        if (licensePlateKey == null
+                || licensePlateKey.length() < LICENSE_PLATE_MIN_LENGTH
+                || licensePlateKey.length() > LICENSE_PLATE_MAX_LENGTH
+                || !licensePlateKey.matches("[A-Z0-9]+")) {
+            reject("licensePlate chỉ được chứa chữ, số, khoảng trắng hoặc dấu gạch nối.");
+        }
+    }
+
     private static void validateCommon(String eventId, String gateId, String licensePlate) {
         validateText(eventId, "eventId", 1, EVENT_ID_MAX_LENGTH);
         validateText(gateId, "gateId", 1, GATE_ID_MAX_LENGTH);

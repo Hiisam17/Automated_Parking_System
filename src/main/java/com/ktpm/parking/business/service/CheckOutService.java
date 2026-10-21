@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Objects;
+import java.util.Optional;
 
 public final class CheckOutService {
 
@@ -41,6 +42,7 @@ public final class CheckOutService {
         GateCommandValidator.validate(command);
 
         String licensePlateKey = LicensePlateNormalizer.toKey(command.licensePlate());
+        GateCommandValidator.validateLicensePlateKey(licensePlateKey);
         String requestHash = GateRequestHasher.forExit(command.gateId(), licensePlateKey);
 
         return unitOfWork.execute(() -> process(command, licensePlateKey, requestHash));
@@ -51,11 +53,11 @@ public final class CheckOutService {
             String licensePlateKey,
             String requestHash
     ) {
-        EventStart eventStart = eventRepository.beginOrReplay(
+        EventStart eventStart = Objects.requireNonNull(eventRepository.beginOrReplay(
                 command.eventId(),
                 GateEventType.EXIT,
                 requestHash
-        );
+        ), "event repository must return an event state");
 
         if (eventStart instanceof EventStart.Replay replay) {
             return GateResult.replay(replay.previous());
@@ -64,11 +66,12 @@ public final class CheckOutService {
             return GateResult.newResult(GateDecision.rejected(ParkingError.EVENT_ID_REUSED));
         }
 
-        ParkingSession session = sessionRepository.lockActiveByLicensePlate(licensePlateKey)
-                .orElse(null);
-        if (session == null) {
+        Optional<ParkingSession> activeSession = sessionRepository
+                .lockActiveByLicensePlate(licensePlateKey);
+        if (activeSession.isEmpty()) {
             return rejectAndSave(command.eventId(), ParkingError.NO_ACTIVE_SESSION);
         }
+        ParkingSession session = activeSession.get();
 
         OffsetDateTime checkOutTime = OffsetDateTime.now(clock)
                 .withOffsetSameInstant(ZoneOffset.UTC);
