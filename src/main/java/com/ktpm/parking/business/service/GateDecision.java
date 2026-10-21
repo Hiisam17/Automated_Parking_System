@@ -30,4 +30,9 @@ public record GateDecision(
     public static GateDecision rejected(String code, String message) {
         return new GateDecision(false, code, message, null, null);
     }
+
+    public static GateDecision rejected(ParkingError error) {
+        Objects.requireNonNull(error, "error must not be null");
+        return rejected(error.code(), error.message());
+    }
 }
