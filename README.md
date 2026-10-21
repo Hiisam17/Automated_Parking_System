@@ -2,6 +2,8 @@
 
 Backend nền tảng cho đồ án quản lý bãi đỗ xe tự động. Gate Simulator sẽ gửi sự kiện xe vào/ra; Admin theo dõi phiên gửi xe, trạng thái chỗ và bảo trì. Phase 1 chỉ dựng nền tảng kỹ thuật, schema và security; chưa triển khai nghiệp vụ check-in, checkout hay thuật toán phân bổ chỗ.
 
+Tài liệu phân công, contract giữa các tầng và Definition of Done cho giai đoạn triển khai tiếp theo nằm tại [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md). Mọi thành viên cần đọc tài liệu này và OpenAPI trước khi tạo nhánh feature.
+
 ## Công nghệ
 
 - Java 21
