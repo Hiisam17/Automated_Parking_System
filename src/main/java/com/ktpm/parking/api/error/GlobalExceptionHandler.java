@@ -11,10 +11,38 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(BadCredentialsException.class)
+    ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
+                "INVALID_CREDENTIALS",
+                "Tên đăng nhập hoặc mật khẩu không đúng."
+        ));
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
+                "UNAUTHORIZED",
+                "Yêu cầu xác thực hợp lệ để truy cập tài nguyên này."
+        ));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiErrorResponse.of(
+                "FORBIDDEN",
+                "Bạn không có quyền thực hiện hành động này."
+        ));
+    }
 
     @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
     ResponseEntity<ApiErrorResponse> handleValidation(Exception exception) {
