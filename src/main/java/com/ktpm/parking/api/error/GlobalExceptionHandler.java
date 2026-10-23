@@ -20,6 +20,10 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * Bắt lỗi sai thông tin đăng nhập (sai username hoặc sai password).
+     * Trả về HTTP 401 Unauthorized kèm mã lỗi INVALID_CREDENTIALS theo đặc tả OpenAPI.
+     */
     @ExceptionHandler(BadCredentialsException.class)
     ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
@@ -28,6 +32,10 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    /**
+     * Bắt lỗi chưa xác thực hoặc token không hợp lệ khi gọi API yêu cầu bảo mật.
+     * Trả về HTTP 401 Unauthorized kèm mã lỗi UNAUTHORIZED.
+     */
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
@@ -36,6 +44,10 @@ public class GlobalExceptionHandler {
         ));
     }
 
+    /**
+     * Bắt lỗi không đủ quyền truy cập (ví dụ Gate gọi vào Admin API).
+     * Trả về HTTP 403 Forbidden kèm mã lỗi FORBIDDEN.
+     */
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException exception) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiErrorResponse.of(

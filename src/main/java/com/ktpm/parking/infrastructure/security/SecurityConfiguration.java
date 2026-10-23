@@ -75,6 +75,10 @@ public class SecurityConfiguration {
                 .build();
     }
 
+    /**
+     * Cấu hình JwtEncoder để ký và phát hành JSON Web Token (JWT) cho Admin khi đăng nhập thành công.
+     * Sử dụng thuật toán đối xứng HMAC-SHA256 với secret key từ cấu hình ứng dụng.
+     */
     @Bean
     JwtEncoder jwtEncoder(SecurityProperties properties) {
         SecretKey secretKey = new SecretKeySpec(

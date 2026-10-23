@@ -5,6 +5,7 @@ import com.ktpm.parking.api.dto.LoginResponse;
 import com.ktpm.parking.business.domain.AdminAccount;
 import com.ktpm.parking.business.repository.AdminAccountRepository;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -23,6 +24,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+/**
+ * Kiểm thử đơn vị (Unit Test) cho AuthService.
+ * Xác minh logic kiểm tra tài khoản, mã hóa mật khẩu và tạo JWT token.
+ */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
@@ -49,17 +54,21 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Đăng nhập thành công khi tài khoản và mật khẩu đều chính xác")
     void shouldLoginSuccessfullyAndReturnToken() {
+        // Giả lập tài khoản admin tồn tại và mật khẩu khớp
         var admin = new AdminAccount(1L, "admin", "$2a$10$hashedPassword", true);
         when(adminAccountRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
         when(passwordEncoder.matches("secret123", "$2a$10$hashedPassword")).thenReturn(true);
 
+        // Giả lập JwtEncoder tạo token thành công
         Jwt mockJwt = mock(Jwt.class);
         when(mockJwt.getTokenValue()).thenReturn("mocked.jwt.token");
         when(jwtEncoder.encode(any(JwtEncoderParameters.class))).thenReturn(mockJwt);
 
         LoginResponse response = authService.login(new LoginRequest("admin", "secret123"));
 
+        // Kiểm tra kết quả trả về đúng token, type Bearer và thời gian hết hạn 3600s
         assertThat(response).isNotNull();
         assertThat(response.accessToken()).isEqualTo("mocked.jwt.token");
         assertThat(response.tokenType()).isEqualTo("Bearer");
@@ -67,6 +76,7 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Ném ngoại lệ BadCredentialsException khi không tìm thấy username")
     void shouldThrowExceptionWhenUserNotFound() {
         when(adminAccountRepository.findByUsername("unknown")).thenReturn(Optional.empty());
 
@@ -76,6 +86,7 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Ném ngoại lệ BadCredentialsException khi tài khoản đã bị vô hiệu hóa (disabled)")
     void shouldThrowExceptionWhenUserDisabled() {
         var disabledAdmin = new AdminAccount(1L, "admin", "$2a$10$hashedPassword", false);
         when(adminAccountRepository.findByUsername("admin")).thenReturn(Optional.of(disabledAdmin));
@@ -86,6 +97,7 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("Ném ngoại lệ BadCredentialsException khi mật khẩu không khớp")
     void shouldThrowExceptionWhenPasswordMismatch() {
         var admin = new AdminAccount(1L, "admin", "$2a$10$hashedPassword", true);
         when(adminAccountRepository.findByUsername("admin")).thenReturn(Optional.of(admin));
