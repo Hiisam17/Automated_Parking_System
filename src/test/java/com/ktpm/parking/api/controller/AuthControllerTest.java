@@ -59,9 +59,9 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").isEqualTo("mocked-jwt-token"))
-                .andExpect(jsonPath("$.tokenType").isEqualTo("Bearer"))
-                .andExpect(jsonPath("$.expiresIn").isEqualTo(3600));
+                .andExpect(jsonPath("$.accessToken").value("mocked-jwt-token"))
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.expiresIn").value(3600));
     }
 
     @Test
@@ -76,8 +76,8 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error.code").isEqualTo("INVALID_CREDENTIALS"))
-                .andExpect(jsonPath("$.error.message").isEqualTo("Tên đăng nhập hoặc mật khẩu không đúng."));
+                .andExpect(jsonPath("$.error.code").value("INVALID_CREDENTIALS"))
+                .andExpect(jsonPath("$.error.message").value("Tên đăng nhập hoặc mật khẩu không đúng."));
     }
 
     @Test
@@ -90,6 +90,6 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").isEqualTo("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 }

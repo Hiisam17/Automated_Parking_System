@@ -71,9 +71,9 @@ class GateControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(GateController.HEADER_EVENT_REPLAYED, "false"))
-                .andExpect(jsonPath("$.status").isEqualTo("ACCEPTED"))
-                .andExpect(jsonPath("$.sessionId").isEqualTo(101))
-                .andExpect(jsonPath("$.assignedSpot").isEqualTo("A05"));
+                .andExpect(jsonPath("$.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.sessionId").value(101))
+                .andExpect(jsonPath("$.assignedSpot").value("A05"));
     }
 
     @Test
@@ -89,9 +89,9 @@ class GateControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(header().string(GateController.HEADER_EVENT_REPLAYED, "true"))
-                .andExpect(jsonPath("$.status").isEqualTo("ACCEPTED"))
-                .andExpect(jsonPath("$.sessionId").isEqualTo(101))
-                .andExpect(jsonPath("$.assignedSpot").isEqualTo("A05"));
+                .andExpect(jsonPath("$.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.sessionId").value(101))
+                .andExpect(jsonPath("$.assignedSpot").value("A05"));
     }
 
     @Test
@@ -107,7 +107,7 @@ class GateControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(header().string(GateController.HEADER_EVENT_REPLAYED, "false"))
-                .andExpect(jsonPath("$.error.code").isEqualTo("NO_AVAILABLE_SPOT"));
+                .andExpect(jsonPath("$.error.code").value("NO_AVAILABLE_SPOT"));
     }
 
     @Test
@@ -122,7 +122,7 @@ class GateControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").isEqualTo("VEHICLE_ALREADY_PARKED"));
+                .andExpect(jsonPath("$.error.code").value("VEHICLE_ALREADY_PARKED"));
     }
 
     @Test
@@ -135,7 +135,7 @@ class GateControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").isEqualTo("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     // ==========================================
@@ -155,9 +155,9 @@ class GateControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(header().string(GateController.HEADER_EVENT_REPLAYED, "false"))
-                .andExpect(jsonPath("$.status").isEqualTo("ACCEPTED"))
-                .andExpect(jsonPath("$.sessionId").isEqualTo(101))
-                .andExpect(jsonPath("$.releasedSpot").isEqualTo("A05"));
+                .andExpect(jsonPath("$.status").value("ACCEPTED"))
+                .andExpect(jsonPath("$.sessionId").value(101))
+                .andExpect(jsonPath("$.releasedSpot").value("A05"));
     }
 
     @Test
@@ -173,7 +173,7 @@ class GateControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isConflict())
                 .andExpect(header().string(GateController.HEADER_EVENT_REPLAYED, "false"))
-                .andExpect(jsonPath("$.error.code").isEqualTo("NO_ACTIVE_SESSION"));
+                .andExpect(jsonPath("$.error.code").value("NO_ACTIVE_SESSION"));
     }
 
     @Test
@@ -185,6 +185,6 @@ class GateControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error.code").isEqualTo("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 }

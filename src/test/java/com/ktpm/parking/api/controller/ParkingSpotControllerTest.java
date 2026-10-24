@@ -69,11 +69,11 @@ class ParkingSpotControllerTest {
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].id").isEqualTo(1))
-                .andExpect(jsonPath("$.items[0].code").isEqualTo("A01"))
-                .andExpect(jsonPath("$.items[0].status").isEqualTo("AVAILABLE"))
-                .andExpect(jsonPath("$.items[0].inMaintenance").isEqualTo(false))
-                .andExpect(jsonPath("$.page.totalElements").isEqualTo(1));
+                .andExpect(jsonPath("$.items[0].id").value(1))
+                .andExpect(jsonPath("$.items[0].code").value("A01"))
+                .andExpect(jsonPath("$.items[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.items[0].inMaintenance").value(false))
+                .andExpect(jsonPath("$.page.totalElements").value(1));
     }
 
     @Test
@@ -84,9 +84,9 @@ class ParkingSpotControllerTest {
 
         mockMvc.perform(post("/api/v1/parking-spots/1/maintenance"))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").isEqualTo(1))
-                .andExpect(jsonPath("$.code").isEqualTo("A01"))
-                .andExpect(jsonPath("$.inMaintenance").isEqualTo(true));
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.code").value("A01"))
+                .andExpect(jsonPath("$.inMaintenance").value(true));
     }
 
     @Test
@@ -97,7 +97,7 @@ class ParkingSpotControllerTest {
 
         mockMvc.perform(post("/api/v1/parking-spots/999/maintenance"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error.code").isEqualTo("SPOT_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SPOT_NOT_FOUND"));
     }
 
     @Test
@@ -108,7 +108,7 @@ class ParkingSpotControllerTest {
 
         mockMvc.perform(post("/api/v1/parking-spots/2/maintenance"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").isEqualTo("SPOT_OCCUPIED"));
+                .andExpect(jsonPath("$.error.code").value("SPOT_OCCUPIED"));
     }
 
     @Test
@@ -119,7 +119,7 @@ class ParkingSpotControllerTest {
 
         mockMvc.perform(post("/api/v1/parking-spots/3/maintenance"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error.code").isEqualTo("ALREADY_IN_MAINTENANCE"));
+                .andExpect(jsonPath("$.error.code").value("ALREADY_IN_MAINTENANCE"));
     }
 
     @Test
@@ -139,6 +139,6 @@ class ParkingSpotControllerTest {
 
         mockMvc.perform(delete("/api/v1/parking-spots/999/maintenance"))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.error.code").isEqualTo("SPOT_NOT_FOUND"));
+                .andExpect(jsonPath("$.error.code").value("SPOT_NOT_FOUND"));
     }
 }
