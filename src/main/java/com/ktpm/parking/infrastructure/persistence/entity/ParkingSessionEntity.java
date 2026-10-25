@@ -27,6 +27,9 @@ public class ParkingSessionEntity {
     @Column(name = "license_plate", nullable = false, length = 20)
     private String licensePlate;
 
+    @Column(name = "license_plate_key", nullable = false, length = 20)
+    private String licensePlateKey;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "vehicle_type", nullable = false, length = 20)
     private VehicleType vehicleType;
@@ -48,11 +51,12 @@ public class ParkingSessionEntity {
     protected ParkingSessionEntity() {
     }
 
-    public ParkingSessionEntity(Long id, String licensePlate, VehicleType vehicleType,
+    public ParkingSessionEntity(Long id, String licensePlate, String licensePlateKey, VehicleType vehicleType,
                                 ParkingSpotEntity parkingSpot, OffsetDateTime checkInTime,
                                 OffsetDateTime checkOutTime, ParkingSessionStatus status) {
         this.id = id;
         this.licensePlate = licensePlate;
+        this.licensePlateKey = licensePlateKey;
         this.vehicleType = vehicleType;
         this.parkingSpot = parkingSpot;
         this.checkInTime = checkInTime;
@@ -66,6 +70,10 @@ public class ParkingSessionEntity {
 
     public String getLicensePlate() {
         return licensePlate;
+    }
+
+    public String getLicensePlateKey() {
+        return licensePlateKey;
     }
 
     public VehicleType getVehicleType() {

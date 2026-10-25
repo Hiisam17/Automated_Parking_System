@@ -1,6 +1,7 @@
 package com.ktpm.parking.infrastructure.persistence.mapper;
 
 import com.ktpm.parking.business.domain.ParkingSession;
+import com.ktpm.parking.business.support.LicensePlateNormalizer;
 import com.ktpm.parking.infrastructure.persistence.entity.ParkingSessionEntity;
 import com.ktpm.parking.infrastructure.persistence.entity.ParkingSpotEntity;
 
@@ -26,6 +27,7 @@ public final class ParkingSessionMapper {
         return new ParkingSessionEntity(
                 domain.id(),
                 domain.licensePlate(),
+                LicensePlateNormalizer.toKey(domain.licensePlate()),
                 domain.vehicleType(),
                 parkingSpot,
                 domain.checkInTime(),
