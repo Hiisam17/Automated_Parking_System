@@ -28,6 +28,11 @@ public class ParkingSessionRepositoryAdapter implements ParkingSessionRepository
     }
 
     @Override
+    public java.util.List<ParkingSession> findAll() {
+        return sessionJpaRepository.findAll().stream().map(ParkingSessionMapper::toDomain).toList();
+    }
+
+    @Override
     public ParkingSession save(ParkingSession parkingSession) {
         ParkingSpotEntity spot = spotJpaRepository.getReferenceById(parkingSession.parkingSpotId());
         return ParkingSessionMapper.toDomain(
