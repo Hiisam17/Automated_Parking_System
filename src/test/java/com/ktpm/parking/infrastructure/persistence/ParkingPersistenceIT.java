@@ -111,6 +111,10 @@ class ParkingPersistenceIT {
         assertThat(text("SELECT license_plate_key FROM parking_sessions")).isEqualTo("29A12345");
         assertThat(text("SELECT gate_id FROM gate_events")).isEqualTo("IN-01");
         assertThat(text("SELECT processing_status FROM gate_events")).isEqualTo("SUCCEEDED");
+        OffsetDateTime eventCreatedAt = jdbc.queryForObject(
+                "SELECT created_at FROM gate_events WHERE event_id = 'entry'",
+                (rs, row) -> rs.getObject(1, OffsetDateTime.class));
+        assertThat(eventCreatedAt).isEqualTo(OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
         assertThat(text("SELECT occupancy_status FROM parking_spots WHERE code = 'A01'"))
                 .isEqualTo("OCCUPIED");
 

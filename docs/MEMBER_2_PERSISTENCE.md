@@ -154,3 +154,27 @@ Luồng Gate HTTP cần được Member 3 kết nối với bean `ParkingService
 - Luồng ENTRY → EXIT được chạy qua Business Service → adapter → PostgreSQL thật
   trong integration test. Không báo cáo đây là E2E Gate HTTP.
 - Đã dừng ứng dụng và dọn PostgreSQL container tạm sau khi chạy thử.
+
+## Đối chiếu TEAM_HANDOFF trước khi push
+
+| Tiêu chí thuộc Member 2 | Bằng chứng trong implementation / integration test |
+|---|---|
+| §7.2, D07, D10: khóa, cập nhật có điều kiện và transaction | Workflow adapter `MANDATORY`, `ParkingUnitOfWork` READ_COMMITTED, phân chỗ theo code; kiểm tra trạng thái mong đợi và rollback cả JPA/JDBC. |
+| §7.3, T06–T07: replay và event ID toàn hệ thống | Upsert + khóa PostgreSQL; replay cả chấp nhận/từ chối; từ chối payload/gate/type khác; kiểm thử request cùng ID chờ commit hoặc rollback. |
+| §8, D08: migration và constraint | V3 backfill key, NOT NULL, partial unique index theo key/spot, index lịch sử; kiểm thử V2 → V3 và rollback migration khi dữ liệu cũ xung đột. V1/V2 không đổi. |
+| D12: thời gian backend qua Clock, UTC | Session giữ Clock của Business; `gate_events.created_at` được adapter ghi từ Clock, thay vì phụ thuộc giá trị mặc định của database. Test xác nhận audit bằng thời gian cố định. |
+| T08–T09: cạnh tranh chỗ và rollback | Hai ENTRY tranh một spot chỉ một request thành công; lỗi trước khi tạo session hoặc khi lưu audit rollback toàn bộ và cho retry cùng event ID. |
+| T10–T11, phần database | Không cấp spot bảo trì; conditional maintenance update tranh ENTRY không tạo trạng thái vừa OCCUPIED vừa bảo trì. |
+| §9, ranh giới Member 2 | Không sửa Business/port/unit test Member 1, Controller/DTO/JWT/OpenAPI Member 3. Binding gateId và wiring chỉ nằm trong infrastructure. |
+| §12, mức test tối thiểu | Kiểm tra trên PostgreSQL thật bằng Testcontainers, không dùng H2 cho locking hoặc partial index. |
+
+Các phần HTTP của T06/T10, maintenance application service, Admin paging và E2E
+API tiếp tục cần Member 3 tích hợp theo contract; bảng trên không đánh dấu các
+phần đó đã hoàn tất. Nhánh feature được push để review; chưa merge schema vào
+`basic_version`.
+
+Kết quả chạy lại sau khi sửa audit time: `mvn --batch-mode clean verify` trên
+image `maven:3.9.16-eclipse-temurin-21-alpine` (Java 21.0.12.1), dùng PostgreSQL
+17.11 qua Testcontainers: **BUILD SUCCESS**, 30 unit test + 35 integration test,
+không failure/error/skip. Assertion mới xác minh `gate_events.created_at` khớp
+Clock cố định. Phần persistence của Member 2 đạt các tiêu chí đối chiếu ở trên.

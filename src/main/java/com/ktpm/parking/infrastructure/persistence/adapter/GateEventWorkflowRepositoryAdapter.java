@@ -12,24 +12,31 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+
 @Repository
 @Transactional(propagation = Propagation.MANDATORY)
 public class GateEventWorkflowRepositoryAdapter {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
-    public GateEventWorkflowRepositoryAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper) {
+    public GateEventWorkflowRepositoryAdapter(JdbcTemplate jdbc, ObjectMapper objectMapper, Clock clock) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     public EventStart beginOrReplay(String eventId, String gateId, GateEventType eventType, String requestHash) {
         int inserted = jdbc.update("""
-                INSERT INTO gate_events (event_id, gate_id, event_type, request_hash, processing_status)
-                VALUES (?, ?, ?, ?, 'PROCESSING')
+                INSERT INTO gate_events (event_id, gate_id, event_type, request_hash, processing_status, created_at)
+                VALUES (?, ?, ?, ?, 'PROCESSING', ?)
                 ON CONFLICT (event_id) DO NOTHING
-                """, eventId, gateId, eventType.name(), requestHash);
+                """, eventId, gateId, eventType.name(), requestHash,
+                OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
         if (inserted == 1) {
             return new EventStart.New();
         }
