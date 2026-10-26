@@ -49,6 +49,7 @@ public class SecurityConfiguration {
                                 "/actuator/health/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
+                                "/v3/api-docs/**",
                                 "/openapi.yaml"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
