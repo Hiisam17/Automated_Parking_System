@@ -56,11 +56,25 @@ public class GlobalExceptionHandler {
         ));
     }
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
+    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class, IllegalArgumentException.class})
     ResponseEntity<ApiErrorResponse> handleValidation(Exception exception) {
         return ResponseEntity.badRequest().body(ApiErrorResponse.of(
                 "VALIDATION_ERROR",
-                "Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ."
+                exception.getMessage() != null && !exception.getMessage().isBlank()
+                        ? exception.getMessage()
+                        : "Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ."
+        ));
+    }
+
+    /**
+     * Bắt lỗi không tìm thấy tài nguyên cụ thể theo nghiệp vụ (ví dụ: SPOT_NOT_FOUND, SESSION_NOT_FOUND).
+     * Trả về HTTP 404 Not Found kèm mã lỗi tương ứng theo đặc tả OpenAPI.
+     */
+    @ExceptionHandler(com.ktpm.parking.business.exception.ResourceNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> handleResourceNotFound(com.ktpm.parking.business.exception.ResourceNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiErrorResponse.of(
+                exception.getCode(),
+                exception.getMessage()
         ));
     }
 
