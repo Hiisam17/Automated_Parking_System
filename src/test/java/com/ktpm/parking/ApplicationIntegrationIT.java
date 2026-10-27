@@ -68,7 +68,7 @@ class ApplicationIntegrationIT {
                 Integer.class
         );
 
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
         assertThat(tableCount).isEqualTo(4);
         assertThat(spotCount).isEqualTo(30);
     }
