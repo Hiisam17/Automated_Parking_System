@@ -13,9 +13,12 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -46,6 +49,7 @@ public class SecurityConfiguration {
                                 "/actuator/health/**",
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
+                                "/v3/api-docs/**",
                                 "/openapi.yaml"
                         ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
@@ -70,6 +74,19 @@ public class SecurityConfiguration {
         return NimbusJwtDecoder.withSecretKey(secretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+    }
+
+    /**
+     * Cấu hình JwtEncoder để ký và phát hành JSON Web Token (JWT) cho Admin khi đăng nhập thành công.
+     * Sử dụng thuật toán đối xứng HMAC-SHA256 với secret key từ cấu hình ứng dụng.
+     */
+    @Bean
+    JwtEncoder jwtEncoder(SecurityProperties properties) {
+        SecretKey secretKey = new SecretKeySpec(
+                properties.jwtSecret().getBytes(StandardCharsets.UTF_8),
+                "HmacSHA256"
+        );
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey));
     }
 
     @Bean

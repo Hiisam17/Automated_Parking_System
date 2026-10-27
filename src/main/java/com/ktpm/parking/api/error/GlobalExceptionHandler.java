@@ -11,16 +11,70 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class})
+    /**
+     * Bắt lỗi sai thông tin đăng nhập (sai username hoặc sai password).
+     * Trả về HTTP 401 Unauthorized kèm mã lỗi INVALID_CREDENTIALS theo đặc tả OpenAPI.
+     */
+    @ExceptionHandler(BadCredentialsException.class)
+    ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
+                "INVALID_CREDENTIALS",
+                "Tên đăng nhập hoặc mật khẩu không đúng."
+        ));
+    }
+
+    /**
+     * Bắt lỗi chưa xác thực hoặc token không hợp lệ khi gọi API yêu cầu bảo mật.
+     * Trả về HTTP 401 Unauthorized kèm mã lỗi UNAUTHORIZED.
+     */
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException exception) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
+                "UNAUTHORIZED",
+                "Yêu cầu xác thực hợp lệ để truy cập tài nguyên này."
+        ));
+    }
+
+    /**
+     * Bắt lỗi không đủ quyền truy cập (ví dụ Gate gọi vào Admin API).
+     * Trả về HTTP 403 Forbidden kèm mã lỗi FORBIDDEN.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiErrorResponse.of(
+                "FORBIDDEN",
+                "Bạn không có quyền thực hiện hành động này."
+        ));
+    }
+
+    @ExceptionHandler({MethodArgumentNotValidException.class, ConstraintViolationException.class, IllegalArgumentException.class})
     ResponseEntity<ApiErrorResponse> handleValidation(Exception exception) {
         return ResponseEntity.badRequest().body(ApiErrorResponse.of(
                 "VALIDATION_ERROR",
-                "Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ."
+                exception.getMessage() != null && !exception.getMessage().isBlank()
+                        ? exception.getMessage()
+                        : "Dữ liệu đầu vào, query hoặc định dạng tham số không hợp lệ."
+        ));
+    }
+
+    /**
+     * Bắt lỗi không tìm thấy tài nguyên cụ thể theo nghiệp vụ (ví dụ: SPOT_NOT_FOUND, SESSION_NOT_FOUND).
+     * Trả về HTTP 404 Not Found kèm mã lỗi tương ứng theo đặc tả OpenAPI.
+     */
+    @ExceptionHandler(com.ktpm.parking.business.exception.ResourceNotFoundException.class)
+    ResponseEntity<ApiErrorResponse> handleResourceNotFound(com.ktpm.parking.business.exception.ResourceNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiErrorResponse.of(
+                exception.getCode(),
+                exception.getMessage()
         ));
     }
 

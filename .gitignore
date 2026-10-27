@@ -6,3 +6,5 @@ target/
 .env
 .DS_Store
 Thumbs.db
+*.xlsx
+MEMBER_3_TASKS.md

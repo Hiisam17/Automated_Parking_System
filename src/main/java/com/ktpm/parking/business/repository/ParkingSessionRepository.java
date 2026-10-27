@@ -8,5 +8,10 @@ public interface ParkingSessionRepository {
 
     Optional<ParkingSession> findById(Long id);
 
+    /**
+     * Lấy toàn bộ danh sách phiên gửi xe phục vụ tra cứu cho Admin.
+     */
+    java.util.List<ParkingSession> findAll();
+
     ParkingSession save(ParkingSession parkingSession);
 }
