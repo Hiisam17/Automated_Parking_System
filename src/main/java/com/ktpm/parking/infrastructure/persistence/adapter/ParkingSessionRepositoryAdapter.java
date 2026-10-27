@@ -7,6 +7,7 @@ import com.ktpm.parking.infrastructure.persistence.mapper.ParkingSessionMapper;
 import com.ktpm.parking.infrastructure.persistence.springdata.ParkingSessionJpaRepository;
 import com.ktpm.parking.infrastructure.persistence.springdata.ParkingSpotJpaRepository;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -23,16 +24,19 @@ public class ParkingSessionRepositoryAdapter implements ParkingSessionRepository
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<ParkingSession> findById(Long id) {
         return sessionJpaRepository.findById(id).map(ParkingSessionMapper::toDomain);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public java.util.List<ParkingSession> findAll() {
         return sessionJpaRepository.findAll().stream().map(ParkingSessionMapper::toDomain).toList();
     }
 
     @Override
+    @Transactional
     public ParkingSession save(ParkingSession parkingSession) {
         ParkingSpotEntity spot = spotJpaRepository.getReferenceById(parkingSession.parkingSpotId());
         return ParkingSessionMapper.toDomain(
