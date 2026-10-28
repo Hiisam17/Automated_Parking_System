@@ -3,7 +3,7 @@ package com.ktpm.parking.api.controller;
 import com.ktpm.parking.api.dto.ParkingSessionPageResponse;
 import com.ktpm.parking.api.dto.ParkingSessionResponse;
 import com.ktpm.parking.business.domain.ParkingSessionStatus;
-import com.ktpm.parking.infrastructure.service.ParkingSessionAdminService;
+import com.ktpm.parking.business.service.ParkingSessionAdminService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -54,14 +54,14 @@ public class ParkingSessionController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        ParkingSessionPageResponse response = parkingSessionAdminService.listParkingSessions(
+        ParkingSessionPageResponse response = ParkingSessionPageResponse.from(parkingSessionAdminService.listParkingSessions(
                 status,
                 licensePlate,
                 from,
                 to,
                 page,
                 size
-        );
+        ));
         return ResponseEntity.ok(response);
     }
 
@@ -75,7 +75,9 @@ public class ParkingSessionController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<ParkingSessionResponse> getParkingSession(@PathVariable @Min(1) Long id) {
-        ParkingSessionResponse response = parkingSessionAdminService.getParkingSession(id);
+        ParkingSessionResponse response = ParkingSessionResponse.fromDomain(
+                parkingSessionAdminService.getParkingSession(id)
+        );
         return ResponseEntity.ok(response);
     }
 }

@@ -2,9 +2,10 @@ package com.ktpm.parking.api.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ktpm.parking.api.dto.LoginRequest;
-import com.ktpm.parking.api.dto.LoginResponse;
 import com.ktpm.parking.api.error.GlobalExceptionHandler;
-import com.ktpm.parking.infrastructure.security.AuthService;
+import com.ktpm.parking.business.exception.InvalidCredentialsException;
+import com.ktpm.parking.business.service.AuthService;
+import com.ktpm.parking.business.service.AuthenticationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -13,11 +14,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -50,8 +50,8 @@ class AuthControllerTest {
     @Test
     @DisplayName("Trả về HTTP 200 OK và thông tin JWT khi đăng nhập thành công")
     void shouldReturnOkWhenLoginSucceeds() throws Exception {
-        var response = LoginResponse.of("mocked-jwt-token", 3600);
-        when(authService.login(any(LoginRequest.class))).thenReturn(response);
+        var response = AuthenticationResult.bearer("mocked-jwt-token", 3600);
+        when(authService.login(anyString(), anyString())).thenReturn(response);
 
         var request = new LoginRequest("admin", "secret123");
 
@@ -67,8 +67,8 @@ class AuthControllerTest {
     @Test
     @DisplayName("Trả về HTTP 401 UNAUTHORIZED kèm mã lỗi INVALID_CREDENTIALS khi sai thông tin đăng nhập")
     void shouldReturn401WhenCredentialsAreInvalid() throws Exception {
-        when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new BadCredentialsException("Tên đăng nhập hoặc mật khẩu không đúng."));
+        when(authService.login(anyString(), anyString()))
+                .thenThrow(new InvalidCredentialsException());
 
         var request = new LoginRequest("admin", "wrongPassword");
 

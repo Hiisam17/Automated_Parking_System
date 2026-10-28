@@ -4,7 +4,7 @@ import com.ktpm.parking.api.dto.ParkingSpotPageResponse;
 import com.ktpm.parking.api.dto.ParkingSpotResponse;
 import com.ktpm.parking.business.domain.ParkingSpotStatus;
 import com.ktpm.parking.business.domain.VehicleType;
-import com.ktpm.parking.infrastructure.service.ParkingSpotAdminService;
+import com.ktpm.parking.business.service.ParkingSpotAdminService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * REST Controller quản lý chỗ đỗ xe dành cho Quản trị viên (Admin).
  * Toàn bộ các API trong controller này yêu cầu xác thực JWT Bearer Token với quyền ROLE_ADMIN.
- * Thuộc phạm vi phụ trách của Member 3.
  */
 @Validated
 @RestController
@@ -54,13 +53,13 @@ public class ParkingSpotController {
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
     ) {
-        ParkingSpotPageResponse response = parkingSpotAdminService.listParkingSpots(
+        ParkingSpotPageResponse response = ParkingSpotPageResponse.from(parkingSpotAdminService.listParkingSpots(
                 status,
                 vehicleType,
                 inMaintenance,
                 page,
                 size
-        );
+        ));
         return ResponseEntity.ok(response);
     }
 
@@ -77,7 +76,7 @@ public class ParkingSpotController {
      */
     @PostMapping("/{id}/maintenance")
     public ResponseEntity<ParkingSpotResponse> startMaintenance(@PathVariable @Min(1) Long id) {
-        ParkingSpotResponse response = parkingSpotAdminService.startMaintenance(id);
+        ParkingSpotResponse response = ParkingSpotResponse.fromDomain(parkingSpotAdminService.startMaintenance(id));
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

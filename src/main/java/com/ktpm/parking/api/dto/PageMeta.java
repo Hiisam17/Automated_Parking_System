@@ -1,5 +1,7 @@
 package com.ktpm.parking.api.dto;
 
+import com.ktpm.parking.business.service.PageResult;
+
 /**
  * DTO chứa thông tin metadata phân trang dùng chung cho các API có phân trang.
  * Khớp với PageMeta schema trong đặc tả OpenAPI.
@@ -23,5 +25,9 @@ public record PageMeta(
     public static PageMeta of(int page, int size, long totalElements) {
         int totalPages = size == 0 ? 0 : (int) Math.ceil((double) totalElements / size);
         return new PageMeta(page, size, totalElements, totalPages);
+    }
+
+    public static PageMeta from(PageResult<?> result) {
+        return new PageMeta(result.page(), result.size(), result.totalElements(), result.totalPages());
     }
 }

@@ -1,13 +1,12 @@
 package com.ktpm.parking.api.controller;
 
-import com.ktpm.parking.api.dto.PageMeta;
-import com.ktpm.parking.api.dto.ParkingSessionPageResponse;
-import com.ktpm.parking.api.dto.ParkingSessionResponse;
 import com.ktpm.parking.api.error.GlobalExceptionHandler;
+import com.ktpm.parking.business.domain.ParkingSession;
 import com.ktpm.parking.business.domain.ParkingSessionStatus;
 import com.ktpm.parking.business.domain.VehicleType;
 import com.ktpm.parking.business.exception.ResourceNotFoundException;
-import com.ktpm.parking.infrastructure.service.ParkingSessionAdminService;
+import com.ktpm.parking.business.service.PageResult;
+import com.ktpm.parking.business.service.ParkingSessionAdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,7 +54,7 @@ class ParkingSessionControllerTest {
     @DisplayName("Lấy danh sách phiên gửi xe: trả về HTTP 200 OK cùng dữ liệu phân trang")
     void shouldReturnSessionListWithPagination() throws Exception {
         var checkInAt = OffsetDateTime.of(2026, 10, 25, 8, 0, 0, 0, ZoneOffset.UTC);
-        var session = new ParkingSessionResponse(
+        var session = new ParkingSession(
                 101L,
                 "29A-12345",
                 VehicleType.MOTORBIKE,
@@ -65,8 +64,7 @@ class ParkingSessionControllerTest {
                 null,
                 ParkingSessionStatus.ACTIVE
         );
-        var pageMeta = PageMeta.of(0, 20, 1);
-        var pageResponse = new ParkingSessionPageResponse(List.of(session), pageMeta);
+        var pageResponse = new PageResult<>(List.of(session), 0, 20, 1);
 
         when(parkingSessionAdminService.listParkingSessions(any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(pageResponse);
@@ -101,7 +99,7 @@ class ParkingSessionControllerTest {
     void shouldReturnSessionDetailSuccessfully() throws Exception {
         var checkInAt = OffsetDateTime.of(2026, 10, 25, 8, 0, 0, 0, ZoneOffset.UTC);
         var checkOutAt = OffsetDateTime.of(2026, 10, 25, 10, 30, 0, 0, ZoneOffset.UTC);
-        var session = new ParkingSessionResponse(
+        var session = new ParkingSession(
                 101L,
                 "29A-12345",
                 VehicleType.MOTORBIKE,

@@ -1,6 +1,7 @@
 package com.ktpm.parking.api.error;
 
 import com.ktpm.parking.business.exception.BusinessException;
+import com.ktpm.parking.business.exception.InvalidCredentialsException;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +25,8 @@ public class GlobalExceptionHandler {
      * Bắt lỗi sai thông tin đăng nhập (sai username hoặc sai password).
      * Trả về HTTP 401 Unauthorized kèm mã lỗi INVALID_CREDENTIALS theo đặc tả OpenAPI.
      */
-    @ExceptionHandler(BadCredentialsException.class)
-    ResponseEntity<ApiErrorResponse> handleBadCredentials(BadCredentialsException exception) {
+    @ExceptionHandler({InvalidCredentialsException.class, BadCredentialsException.class})
+    ResponseEntity<ApiErrorResponse> handleBadCredentials(Exception exception) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiErrorResponse.of(
                 "INVALID_CREDENTIALS",
                 "Tên đăng nhập hoặc mật khẩu không đúng."

@@ -2,7 +2,8 @@ package com.ktpm.parking.api.controller;
 
 import com.ktpm.parking.api.dto.LoginRequest;
 import com.ktpm.parking.api.dto.LoginResponse;
-import com.ktpm.parking.infrastructure.security.AuthService;
+import com.ktpm.parking.business.service.AuthService;
+import com.ktpm.parking.business.service.AuthenticationResult;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -34,7 +35,8 @@ public class AuthController {
      */
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
+        AuthenticationResult result = authService.login(request.username(), request.password());
+        LoginResponse response = LoginResponse.of(result.accessToken(), result.expiresIn());
         return ResponseEntity.ok(response);
     }
 }

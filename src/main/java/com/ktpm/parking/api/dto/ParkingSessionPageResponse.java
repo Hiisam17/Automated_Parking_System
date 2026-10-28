@@ -1,5 +1,8 @@
 package com.ktpm.parking.api.dto;
 
+import com.ktpm.parking.business.domain.ParkingSession;
+import com.ktpm.parking.business.service.PageResult;
+
 import java.util.List;
 
 /**
@@ -13,4 +16,10 @@ public record ParkingSessionPageResponse(
         // Thông tin metadata phân trang
         PageMeta page
 ) {
+    public static ParkingSessionPageResponse from(PageResult<ParkingSession> result) {
+        return new ParkingSessionPageResponse(
+                result.items().stream().map(ParkingSessionResponse::fromDomain).toList(),
+                PageMeta.from(result)
+        );
+    }
 }

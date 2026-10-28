@@ -1,14 +1,13 @@
 package com.ktpm.parking.api.controller;
 
-import com.ktpm.parking.api.dto.PageMeta;
-import com.ktpm.parking.api.dto.ParkingSpotPageResponse;
-import com.ktpm.parking.api.dto.ParkingSpotResponse;
 import com.ktpm.parking.api.error.GlobalExceptionHandler;
+import com.ktpm.parking.business.domain.ParkingSpot;
 import com.ktpm.parking.business.domain.ParkingSpotStatus;
 import com.ktpm.parking.business.domain.VehicleType;
 import com.ktpm.parking.business.exception.BusinessException;
 import com.ktpm.parking.business.exception.ResourceNotFoundException;
-import com.ktpm.parking.infrastructure.service.ParkingSpotAdminService;
+import com.ktpm.parking.business.service.PageResult;
+import com.ktpm.parking.business.service.ParkingSpotAdminService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -58,9 +57,8 @@ class ParkingSpotControllerTest {
     @Test
     @DisplayName("Lấy danh sách chỗ đỗ: trả về HTTP 200 OK cùng dữ liệu phân trang")
     void shouldReturnSpotListWithPagination() throws Exception {
-        var spot = new ParkingSpotResponse(1L, "A01", VehicleType.MOTORBIKE, ParkingSpotStatus.AVAILABLE, false);
-        var pageMeta = PageMeta.of(0, 20, 1);
-        var pageResponse = new ParkingSpotPageResponse(List.of(spot), pageMeta);
+        var spot = new ParkingSpot(1L, "A01", VehicleType.MOTORBIKE, ParkingSpotStatus.AVAILABLE, false);
+        var pageResponse = new PageResult<>(List.of(spot), 0, 20, 1);
 
         when(parkingSpotAdminService.listParkingSpots(any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(pageResponse);
@@ -79,7 +77,7 @@ class ParkingSpotControllerTest {
     @Test
     @DisplayName("Bật bảo trì thành công: trả về HTTP 201 Created kèm inMaintenance = true")
     void shouldStartMaintenanceSuccessfully() throws Exception {
-        var updatedSpot = new ParkingSpotResponse(1L, "A01", VehicleType.MOTORBIKE, ParkingSpotStatus.AVAILABLE, true);
+        var updatedSpot = new ParkingSpot(1L, "A01", VehicleType.MOTORBIKE, ParkingSpotStatus.AVAILABLE, true);
         when(parkingSpotAdminService.startMaintenance(1L)).thenReturn(updatedSpot);
 
         mockMvc.perform(post("/api/v1/parking-spots/1/maintenance"))
