@@ -1,26 +1,100 @@
 # Automated Parking System
 
-Backend cho đồ án quản lý bãi đỗ xe tự động. Gate Simulator sẽ gửi sự kiện xe vào/ra; Admin theo dõi phiên gửi xe, trạng thái chỗ và bảo trì. Nền tảng kỹ thuật đã hoàn thành; Business Layer cho check-in, checkout, phân bổ chỗ, validation và event replay đã có dưới dạng Java thuần. Các workflow này chưa được nối với REST API hoặc PostgreSQL cho đến khi phần việc Member 2 và Member 3 được tích hợp.
+Backend quản lý bãi đỗ xe tự động. Gate Simulator gửi sự kiện xe vào/ra; hệ thống phân bổ chỗ, quản lý phiên gửi xe và trả quyết định đồng bộ. Admin đăng nhập để theo dõi chỗ đỗ, tra cứu phiên và quản lý trạng thái bảo trì.
 
-Tài liệu phân công, contract giữa các tầng và Definition of Done cho giai đoạn triển khai tiếp theo nằm tại [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md). Mọi thành viên cần đọc tài liệu này và OpenAPI trước khi tạo nhánh feature.
+## Chức năng hiện có
+
+- Check-in xe, chuẩn hóa biển số và tự động chọn chỗ phù hợp loại xe.
+- Checkout xe, hoàn tất phiên gửi và giải phóng chỗ.
+- Chống xử lý lặp bằng `eventId`; cùng event và payload trả lại kết quả cũ.
+- Từ chối event dùng lại với payload khác.
+- Đăng nhập Admin và phát hành JWT.
+- Tra cứu, lọc và phân trang chỗ đỗ hoặc phiên gửi xe.
+- Bật/tắt bảo trì cho chỗ đỗ.
+- Ghi nhận lịch sử sự kiện cổng và quyết định nghiệp vụ trong PostgreSQL.
+
+## API
+
+| Method | Endpoint | Xác thực | Mục đích |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/auth/login` | Public | Đăng nhập Admin và nhận JWT |
+| `POST` | `/api/v1/gates/entry` | `X-Gate-Api-Key` | Check-in và phân bổ chỗ |
+| `POST` | `/api/v1/gates/exit` | `X-Gate-Api-Key` | Checkout và giải phóng chỗ |
+| `GET` | `/api/v1/parking-spots` | JWT `ADMIN` | Lọc và phân trang chỗ đỗ |
+| `POST` | `/api/v1/parking-spots/{id}/maintenance` | JWT `ADMIN` | Bắt đầu bảo trì |
+| `DELETE` | `/api/v1/parking-spots/{id}/maintenance` | JWT `ADMIN` | Kết thúc bảo trì |
+| `GET` | `/api/v1/parking-sessions` | JWT `ADMIN` | Lọc và phân trang phiên gửi xe |
+| `GET` | `/api/v1/parking-sessions/{id}` | JWT `ADMIN` | Xem chi tiết phiên gửi xe |
+
+Hợp đồng request, response, status code và error code nằm tại [`src/main/resources/static/openapi.yaml`](src/main/resources/static/openapi.yaml). Khi ứng dụng chạy:
+
+- Swagger UI: <http://localhost:8080/swagger-ui.html>
+- OpenAPI: <http://localhost:8080/openapi.yaml>
+- Health check: <http://localhost:8080/actuator/health>
+
+## Kiến trúc
+
+Luồng xử lý runtime:
+
+```text
+HTTP API -> Business Service -> Repository Port -> Persistence Adapter -> PostgreSQL
+```
+
+Hướng phụ thuộc mã nguồn:
+
+```text
+API ----------> Business <---------- Infrastructure
+Controller      Domain, use case      Spring, Security, JPA/JDBC
+DTO mapping     Port/interface        Adapter, transaction, config
+```
+
+Business Layer là Java thuần, không import Spring MVC, Spring Data, JPA hoặc Hibernate. API chỉ xử lý HTTP/validation và ánh xạ DTO. Infrastructure triển khai các port do Business định nghĩa, quản lý transaction, bảo mật và lưu trữ.
+
+```text
+src/main/java/com/ktpm/parking
+├── api
+│   ├── controller       # REST endpoints
+│   ├── dto              # Request/response và ánh xạ HTTP
+│   └── error            # Error response và exception mapping
+├── business
+│   ├── domain           # Domain model
+│   ├── exception        # Lỗi nghiệp vụ
+│   ├── port             # Port cho password/token
+│   ├── repository       # Port truy cập dữ liệu/transaction
+│   ├── service          # Use case và quy tắc nghiệp vụ
+│   └── support          # Chuẩn hóa biển số, request hash
+└── infrastructure
+    ├── bootstrap        # Khởi tạo Admin đầu tiên
+    ├── config           # Wiring Business Service và OpenAPI
+    ├── persistence      # JPA/JDBC entity, mapper và adapter
+    ├── security         # JWT, BCrypt và Gate API-key filter
+    └── transaction      # Transaction boundary cho parking workflow
+```
+
+## Dữ liệu và tính nhất quán
+
+- PostgreSQL 17, schema quản lý bằng Flyway.
+- Migration hiện tại: V1 tạo schema, V2 seed chỗ đỗ, V3 thêm khóa biển số chuẩn hóa.
+- Seed mặc định: 20 chỗ `MOTORBIKE` (`A01`–`A20`) và 10 chỗ `CAR` (`B01`–`B10`).
+- Partial unique index ngăn một xe hoặc một chỗ có nhiều phiên `ACTIVE`.
+- Check-in/checkout chạy trong transaction và sử dụng row/advisory lock.
+- Kết quả Gate Event được lưu để hỗ trợ idempotent replay.
+- Thời gian nghiệp vụ được ghi theo UTC.
 
 ## Công nghệ
 
 - Java 21
-- Spring Boot 3.5.16 và Maven
-- PostgreSQL 17, Spring Data JPA và Flyway
-- Spring Security: JWT cho Admin, API key cho Gate Simulator
-- Springdoc OpenAPI 2.8.17 và Swagger UI
+- Spring Boot 3.5
+- Maven 3.9+
+- PostgreSQL 17, Flyway, Spring Data JPA và JDBC
+- Spring Security, JWT HMAC-SHA256 và BCrypt
+- OpenAPI/Swagger UI
 - JUnit 5, Mockito và Testcontainers
-- Docker, Docker Compose và GitHub Actions
+- Docker Compose và GitHub Actions
 
-## Yêu cầu cài đặt
+## Chạy bằng Docker Compose
 
-- JDK 21 trở lên
-- Maven 3.9 trở lên
-- Docker Desktop hoặc Docker Engine có Docker Compose
-
-## Clone và cấu hình
+Yêu cầu: Docker Desktop hoặc Docker Engine có Docker Compose.
 
 ```bash
 git clone https://github.com/Hiisam17/Automated_Parking_System.git
@@ -28,94 +102,89 @@ cd Automated_Parking_System
 cp .env.example .env
 ```
 
-Thay toàn bộ giá trị `replace-with-...` trong `.env`. Không commit `.env`. `JWT_SECRET` phải có ít nhất 32 ký tự, `GATE_API_KEY` ít nhất 16 ký tự. Nếu để trống cả hai biến `ADMIN_BOOTSTRAP_USERNAME` và `ADMIN_BOOTSTRAP_PASSWORD`, ứng dụng sẽ không tạo Admin ban đầu.
-
-## Chạy PostgreSQL và backend bằng Maven
-
-Khởi động riêng PostgreSQL:
+Thay toàn bộ giá trị `replace-with-...` trong `.env`, sau đó chạy:
 
 ```bash
-docker compose up -d database
+docker compose up -d --build
+docker compose ps
 ```
 
-Nạp biến môi trường từ `.env`, sau đó chạy:
+Docker Compose tự đọc `.env`, khởi tạo PostgreSQL, chạy Flyway và khởi động backend sau khi database healthy.
+
+Dừng dịch vụ nhưng giữ dữ liệu:
 
 ```bash
-mvn spring-boot:run
+docker compose down
 ```
 
-Trên PowerShell có thể nạp biến bằng:
+Lệnh sau xóa cả volume PostgreSQL và toàn bộ dữ liệu local:
+
+```bash
+docker compose down -v
+```
+
+## Biến môi trường
+
+| Biến | Bắt buộc | Mô tả |
+| --- | --- | --- |
+| `POSTGRES_DB` | Docker Compose | Tên database |
+| `POSTGRES_USER` | Docker Compose | User PostgreSQL |
+| `POSTGRES_PASSWORD` | Có | Mật khẩu PostgreSQL |
+| `DB_URL` | Khi chạy ngoài Compose | JDBC URL; mặc định `jdbc:postgresql://localhost:5432/automated_parking` |
+| `DB_USERNAME` | Khi chạy ngoài Compose | User JDBC; mặc định `parking` |
+| `DB_PASSWORD` | Khi chạy ngoài Compose | Mật khẩu JDBC |
+| `GATE_API_KEY` | Có | API key cho Gate, tối thiểu 16 ký tự |
+| `JWT_SECRET` | Có | Khóa ký JWT, tối thiểu 32 ký tự |
+| `JWT_EXPIRATION_SECONDS` | Không | Thời hạn JWT; mặc định 3600 giây |
+| `ADMIN_BOOTSTRAP_USERNAME` | Không | Username Admin được tạo ở lần khởi động đầu |
+| `ADMIN_BOOTSTRAP_PASSWORD` | Không | Mật khẩu Admin ban đầu, lưu dưới dạng BCrypt |
+
+Hai biến bootstrap Admin phải cùng có giá trị hoặc cùng để trống. Bootstrap không ghi đè tài khoản đã tồn tại; đổi mật khẩu trong `.env` không tự đổi mật khẩu của Admin trong database cũ.
+
+Không commit `.env`. Repository chỉ lưu `.env.example` làm mẫu.
+
+## Chạy bằng Maven
+
+Yêu cầu: JDK 21+, Maven 3.9+ và PostgreSQL đang chạy.
+
+Spring Boot không tự đọc file `.env`. Trên PowerShell, nạp biến trước khi chạy:
 
 ```powershell
 Get-Content .env | Where-Object { $_ -and -not $_.StartsWith('#') } | ForEach-Object {
   $name, $value = $_ -split '=', 2
   Set-Item -Path "Env:$name" -Value $value
 }
+
+$env:DB_URL = "jdbc:postgresql://localhost:5432/$env:POSTGRES_DB"
+$env:DB_USERNAME = $env:POSTGRES_USER
+$env:DB_PASSWORD = $env:POSTGRES_PASSWORD
 mvn spring-boot:run
 ```
 
-## Chạy toàn bộ bằng Docker Compose
-
-```bash
-docker compose up --build
-```
-
-- Health: <http://localhost:8080/actuator/health>
-- Swagger UI: <http://localhost:8080/swagger-ui.html>
-- OpenAPI contract: <http://localhost:8080/openapi.yaml>
-
-## Chạy kiểm thử
+## Kiểm thử
 
 ```bash
 mvn clean verify
 ```
 
-Unit test luôn chạy. Integration test dùng PostgreSQL thật qua Testcontainers và tự bỏ qua khi Docker không khả dụng.
+- Unit tests kiểm tra controller mapping, validation và Business Service.
+- Integration tests dùng PostgreSQL thật qua Testcontainers để kiểm tra Flyway, persistence, transaction, locking và application context.
+- Integration tests tự bỏ qua nếu Docker không khả dụng.
 
-## Cấu trúc project
+CI chạy cùng lệnh trên mọi push vào `basic_version`/`main` và trên pull request.
 
-```text
-src/main/java/com/ktpm/parking
-├── api                    # Controller, DTO, validation, exception handler ở Phase 2
-├── business
-│   ├── domain             # Domain model thuần Java
-│   ├── repository         # Repository interface của Business Layer
-│   └── support            # Quy tắc dùng chung không phụ thuộc framework
-└── infrastructure
-    ├── bootstrap          # Tạo Admin từ biến môi trường
-    ├── persistence        # JPA entity, Spring Data, mapper, adapter
-    └── security           # JWT và API key
-src/main/resources
-├── db/migration           # Schema và seed data Flyway
-└── static/openapi.yaml    # Hợp đồng 8 API
-```
+## Quy ước mở rộng
 
-Business Layer không phụ thuộc Spring MVC, Spring Data JPA, Hibernate hoặc PostgreSQL. JPA entity được tách khỏi domain model; adapter là cầu nối giữa repository interface và Spring Data.
+- Cập nhật `openapi.yaml` trước hoặc cùng lúc khi thay đổi API contract.
+- Đặt quy tắc nghiệp vụ và use case trong `business`; không import framework vào package này.
+- Định nghĩa port trong `business`, triển khai adapter trong `infrastructure`.
+- Controller chỉ validation, gọi Business Service và ánh xạ DTO.
+- Mọi thay đổi schema phải thêm Flyway migration mới; không sửa migration đã phát hành.
+- Thêm unit test cho quy tắc nghiệp vụ và integration test cho persistence/concurrency quan trọng.
 
-## Đã setup
+## Giới hạn cần xử lý ở phase tiếp theo
 
-- Project Spring Boot có thể build và đóng gói bằng Maven.
-- Schema cho `parking_spots`, `parking_sessions`, `gate_events`, `admin_accounts` với foreign key, check constraint và partial unique index.
-- Seed 20 chỗ MOTORBIKE (`A01`–`A20`) và 10 chỗ CAR (`B01`–`B10`).
-- Admin bootstrap an toàn từ biến môi trường, lưu mật khẩu BCrypt.
-- Security nền tảng: API key cho `/api/v1/gates/**`, JWT role `ADMIN` cho API quản trị.
-- Swagger UI đọc trực tiếp file OpenAPI đã thống nhất.
-- Unit test, integration test Testcontainers, migration/context/health test, Docker Compose và CI.
-- Business workflow của Member 1: check-in, checkout, phân bổ chỗ qua locking port, validation, request hash và event replay.
-- Unit test Business dùng mock port, `Clock` cố định và không phụ thuộc Spring/JPA.
-
-## Chưa tích hợp
-
-- Controller và xử lý `POST /api/v1/auth/login`.
-- Adapter PostgreSQL cho các workflow port, transaction/locking thật và migration `license_plate_key`.
-- Wiring Business Service vào controller và persistence adapter.
-- API tra cứu, phân trang và quản lý bảo trì.
-- Cơ chế phát hành JWT. Cấu hình hiện tại mới xác minh JWT HMAC; Member 3 sẽ cung cấp luồng đăng nhập và phát hành token.
-
-Các endpoint nghiệp vụ trong OpenAPI chưa hoạt động cho đến khi hoàn thành integration. Nhóm tiếp tục code đúng contract tại `openapi.yaml` và `docs/TEAM_HANDOFF.md`.
-
-## Phân chia tham khảo
-
-- Member 1: check-in, checkout, phân bổ chỗ và validation nghiệp vụ.
-- Member 2: persistence adapter, transaction, constraint và integration test.
-- Member 3: controller, DTO, đăng nhập/JWT, Admin API và Swagger.
+- Thao tác bảo trì cần dùng conditional update/locking thống nhất với check-in để loại bỏ race condition.
+- Response `401/403` từ Spring Security cần được chuẩn hóa theo `ErrorResponse` trong OpenAPI.
+- API danh sách hiện lọc và phân trang trong bộ nhớ; cần chuyển xuống truy vấn database khi dữ liệu tăng.
+- Cần bổ sung load test, kết quả baseline, metrics và quan sát hệ thống trước khi tối ưu hiệu năng.
