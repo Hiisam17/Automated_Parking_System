@@ -172,19 +172,3 @@ mvn clean verify
 - Integration tests tự bỏ qua nếu Docker không khả dụng.
 
 CI chạy cùng lệnh trên mọi push vào `basic_version`/`main` và trên pull request.
-
-## Quy ước mở rộng
-
-- Cập nhật `openapi.yaml` trước hoặc cùng lúc khi thay đổi API contract.
-- Đặt quy tắc nghiệp vụ và use case trong `business`; không import framework vào package này.
-- Định nghĩa port trong `business`, triển khai adapter trong `infrastructure`.
-- Controller chỉ validation, gọi Business Service và ánh xạ DTO.
-- Mọi thay đổi schema phải thêm Flyway migration mới; không sửa migration đã phát hành.
-- Thêm unit test cho quy tắc nghiệp vụ và integration test cho persistence/concurrency quan trọng.
-
-## Giới hạn cần xử lý ở phase tiếp theo
-
-- Thao tác bảo trì cần dùng conditional update/locking thống nhất với check-in để loại bỏ race condition.
-- Response `401/403` từ Spring Security cần được chuẩn hóa theo `ErrorResponse` trong OpenAPI.
-- API danh sách hiện lọc và phân trang trong bộ nhớ; cần chuyển xuống truy vấn database khi dữ liệu tăng.
-- Cần bổ sung load test, kết quả baseline, metrics và quan sát hệ thống trước khi tối ưu hiệu năng.
