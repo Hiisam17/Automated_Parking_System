@@ -1,21 +1,23 @@
 
 ## 1. Phạm vi và đặc tả
 
-### 1.1. Tác nhân và quy tắc
+### 1.1. Giới thiệu dự án
 
-| Tác nhân | Chức năng | Xác thực |
-| --- | --- | --- |
-| Gate Simulator | Gửi sự kiện xe vào/ra, nhận kết quả, gửi lại khi cần | Header `X-Gate-Api-Key` |
-| Admin | Đăng nhập, tra cứu chỗ/phiên, bật hoặc kết thúc bảo trì | JWT Bearer, quyền `ADMIN` |
+Automated Parking System là hệ thống quản lý bãi đỗ xe tự động, nhằm giảm sự phụ thuộc vào nhân viên trong việc ghi nhận xe vào/ra, phân bổ chỗ đỗ và cập nhật trạng thái bãi xe.
 
-Hỗ trợ `MOTORBIKE`, `CAR`. Chưa có frontend nghiệp vụ, phần cứng/camera nhận diện biển số, tài khoản khách/nhân viên, thanh toán, đặt chỗ trước, quản lý nhiều bãi hoặc API đăng ký. Dùng Swagger UI hoặc HTTP client để mô phỏng cổng.
+Hệ thống sử dụng Gate Simulator để mô phỏng các sự kiện xe vào/ra thông qua REST API, đồng thời cho phép Admin theo dõi và quản lý hoạt động của bãi đỗ xe.
 
-- Biển số đầu vào dài 4–20 ký tự. Dạng hiển thị viết hoa, gộp khoảng trắng liên tiếp. `licensePlateKey` bỏ khoảng trắng và dấu `-`, viết hoa, chỉ chứa 4–20 ký tự `A-Z`, `0-9`; `29a-12345` và `29A 12345` cùng khóa `29A12345`.
-- Cấp chỗ `AVAILABLE`, đúng `vehicleType`, `inMaintenance=false`, theo `code` tăng dần; không chuyển sang loại chỗ khác khi hết chỗ phù hợp.
-- Mỗi biển số chuẩn hóa và mỗi chỗ có tối đa một phiên `ACTIVE`. Xe ra phải có phiên ACTIVE; hoàn tất thành `COMPLETED`, trả chỗ về `AVAILABLE`.
-- `status` độc lập với `inMaintenance`: chỗ trống đang bảo trì vẫn có `status=AVAILABLE` nhưng không được cấp. Chỉ bật bảo trì khi trống và chưa bảo trì; kết thúc bảo trì không xóa chỗ, gửi nhiều lần vẫn trả `204` nếu chỗ tồn tại.
-- `Clock` ghi thời gian UTC, API dùng ISO 8601. ACTIVE chưa có thời gian ra; COMPLETED phải có thời gian ra không trước thời gian vào.
-- Chỗ, phiên và kết quả sự kiện cổng được ghi trong cùng giao dịch (transaction). Xác nhận giao dịch là commit; lỗi kỹ thuật hoàn tác toàn bộ (rollback). Rủi ro bảo trì đồng thời được nêu ở mục 2.2.
+Chức năng chính
+
+Check-in tự động: Tiếp nhận thông tin xe, kiểm tra điều kiện và phân bổ chỗ đỗ phù hợp.
+
+Checkout tự động: Kết thúc phiên gửi xe và giải phóng chỗ đỗ.
+
+Quản lý chỗ đỗ: Xem danh sách, trạng thái và lọc chỗ đỗ theo loại xe.
+
+Quản lý bảo trì: Cho phép Admin bật/tắt trạng thái bảo trì đối với chỗ đỗ.
+
+Quản lý phiên gửi xe: Theo dõi phiên đang hoạt động và tra cứu lịch sử gửi xe.
 
 ### 1.2. API và lỗi
 
