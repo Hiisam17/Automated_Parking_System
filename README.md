@@ -257,15 +257,6 @@ Sau mục 3.1, chuẩn bị API key và Admin trong `.env`:
 ## 5. Kết quả kiểm thử tải
 ### 5.2. Môi trường và số liệu Kaggle
 
-
-| Máy chủ  | Giá trị |
-| --- | --- |
-| Model | Lenovo Legion 5 Pro 2022, |
-| CPU | Intel Core i7-12700H ; 14 nhân/20 luồng |
-| RAM | 16 GB|
-| OS | Windows 11 Home  |
-
-
 | Runtime Kaggle | Giá trị |
 | --- | --- |
 | OS / Python | `Linux-6.18.55+-x86_64-with-glibc2.39` / `3.13.15` |
@@ -274,25 +265,19 @@ Sau mục 3.1, chuẩn bị API key và Admin trong `.env`:
 | Working disk total / Working disk free | 19,52 GB / 19,50 GB |
 
 
-Thông tin thiếu:
-
-- Độ trễ ghi từ Kaggle gồm ảnh hưởng Internet/tunnel.
-
-
-
 p50/p95/p99 tổng hợp có đơn vị ms; p95 là mốc khoảng 95% yêu cầu không vượt quá. Thông lượng làm tròn hai chữ số thập phân; nhấn mức tải để xem ảnh.
 
 | Người dùng ảo | Tạo người dùng/giây | Thời lượng cấu hình | Tổng yêu cầu | Lượt lỗi | Yêu cầu/giây | p50 (ms) | p95 (ms) | p99 (ms) |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+|---|---|---|---|---|---|---|---|---|
 | [5](docs/load-testing/kaggle/images/image1.png) | 1 | 1 phút | 196 | 0 | 3,33 | 520 | 820 | 1.100 |
 | [25](docs/load-testing/kaggle/images/image6.png) | 5 | 3 phút | 2.433 | 0 | 13,51 | 890 | 1.200 | 1.400 |
 | [50](docs/load-testing/kaggle/images/image4.png) | 10 | 5 phút | 4.407 | 0 | 14,63 | 2.800 | 3.200 | 3.400 |
 | [75](docs/load-testing/kaggle/images/image3.png) | 10 | 5 phút | 4.427 | 0 | 14,64 | 4.900 | 5.300 | 5.400 |
 | [100](docs/load-testing/kaggle/images/image2.png) | 10 | 5 phút | 4.431 | 0 | 14,61 | 7.000 | 7.400 | 7.500 |
 | [200](docs/load-testing/kaggle/images/image5.png) | 20 | 5 phút | 4.502 | 0 | 14,65 | 16.000 | 16.000 | 16.000 |
-| [500](docs/load-testing/kaggle/images/image7.png) | 25 | 5 phút | Chưa có | 3.665 | Chưa có | Chưa có | Chưa có | Chưa có |
+| [500](docs/load-testing/kaggle/images/image7.png) | 25 | 5 phút | 8.219 | 3.665 (44,59%) | 26,53 | 7.800 | 20.000 | 20.000 |
 
-Mức 500 chỉ có bảng lỗi: chưa biết tổng yêu cầu, tỷ lệ thất bại, thông lượng hay phân vị độ trễ. Các ô “Chưa có” thể hiện thiếu số liệu.
+
 
 p95 từng API (ms), theo nhãn ảnh:
 
@@ -317,20 +302,6 @@ Lỗi tại 500 người dùng:
 
 502 chiếm 98,66% số lượt lỗi, không phải tổng yêu cầu. `HTTP 0` là nhãn kịch bản, không phải HTTP chuẩn; cần log phân loại. Ghi chú nguồn nói backend không restart, health phục hồi; chưa có log/thời gian phục hồi để đối chiếu.
 
-### 5.3. Phân tích và phép đo tiếp theo
-
-5–25 người dùng không có lỗi theo kịch bản nhưng chưa có ngưỡng chất lượng; thời lượng khác nhau nên chưa kết luận tăng năng lực. Chọn 50 làm mốc đo lại vì đây là lần chạy 5 phút đầu tiên có thông lượng gần các mức cao hơn.
-
-Từ 50 lên 200 người dùng: tải ×4, thông lượng chỉ +0,15% (giá trị chưa làm tròn); p95 chỗ ×5, phiên ×4,4, đăng nhập ×3,37. Các mức 75–200 tăng chờ nhưng ít tăng thông lượng. Khoảng 14,6 yêu cầu/giây chưa phải công suất tối đa riêng của backend hay giới hạn số người dùng. Ảnh là tăng tải, chưa phải so sánh trước/sau kiến trúc.
-
-| Giả thuyết cần kiểm chứng | Đo tiếp |
-| --- | --- |
-| Đọc toàn bảng/xử lý danh sách | Số dòng/SQL, thời gian SQL và service, đối chiếu độ trễ khách; seed có 30 chỗ nhưng số bản ghi lúc đo chưa biết, chưa thể quy độ trễ chỗ cho `findAll()` |
-| Nghẽn tài nguyên dùng chung | Thu CPU/RAM cho từng tiến trình trên Lenovo, heap/GC, số luồng HTTP đang hoạt động/chờ, mức sử dụng và thời gian chờ kết nối DB; theo dõi riêng tài nguyên bộ tạo tải trên Kaggle. Trong `AuthService`, tách truy vấn tài khoản, BCrypt, phát JWT |
-| Tunnel/proxy | Ghép thời điểm lỗi với log tunnel/proxy/backend/DB, xác định nơi tạo 502; chẩn đoán truy cập trực tiếp cùng hệ thống/tải nếu khả thi |
-| Phục hồi tải cao | Theo dõi health, p95, tỷ lệ lỗi sau hạ tải; một lần health thành công chưa chứng minh tải bình thường đã phục hồi |
-
-Ưu tiên theo dõi GET chỗ vì tỷ trọng và p95 cao, vẫn đo riêng phiên/login để phát hiện hồi quy. Chưa có bằng chứng về tranh chấp Gate, lỗi bảo trì hoặc nhu cầu tác vụ nền; cần kịch bản riêng nếu chọn các bài toán đó. Nguyên nhân lỗi 502 chưa được xác định.
 
 ## 6. 1 số vấn đề hiện tại
 
