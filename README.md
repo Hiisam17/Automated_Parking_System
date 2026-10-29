@@ -64,14 +64,13 @@ Gate bắt buộc `eventId`, `gateId` (mỗi trường tối đa 64 ký tự) v�
 
 Lỗi có dạng `{"error":{"code":"...","message":"..."}}`. Chưa có ánh xạ riêng sang `503`; lỗi chưa xử lý thường trả `500`. Pha 2 cần chuẩn hóa lỗi xác thực/phân quyền, đọc JSON và chuyển đổi tham số truy vấn theo đặc tả.
 
-### 1.3. Gửi lại sự kiện
+### 1.3. Công nghệ
 
-`eventId` duy nhất toàn hệ thống cổng, dùng chung ENTRY/EXIT. SHA-256 băm loại sự kiện, `gateId`, khóa biển số và loại xe đối với ENTRY.
-
-- Cùng ID/dữ liệu sau chuẩn hóa: giữ mã HTTP, body và kết quả đã lưu, kể cả từ chối; header `X-Event-Replayed: true`. Sự kiện mới có `X-Event-Replayed: false`.
-- ID cũ nhưng khác cổng, loại sự kiện hoặc dữ liệu: trả `409 EVENT_ID_REUSED`, giữ kết quả cũ.
-- Sự kiện bị từ chối do hết chỗ vẫn trả kết quả cũ khi bãi có chỗ; lần thử nghiệp vụ mới cần ID mới.
-- Timeout/mất phản hồi: gửi lại cùng ID và dữ liệu, có thể tăng khoảng chờ và giới hạn số lần thử. Giao dịch đã rollback do lỗi kỹ thuật có thể được xử lý lại bằng cùng ID.
+- Spring Boot 3.5
+- Maven 3.9+
+- PostgreSQL 17, Flyway, Spring Data JPA và JDBC
+- Spring Security, JWT HMAC-SHA256 và BCrypt
+- Docker Compose
 
 ## 2. Kiến trúc và dữ liệu
 
@@ -333,24 +332,17 @@ Từ 50 lên 200 người dùng: tải ×4, thông lượng chỉ +0,15% (giá t
 
 Ưu tiên theo dõi GET chỗ vì tỷ trọng và p95 cao, vẫn đo riêng phiên/login để phát hiện hồi quy. Chưa có bằng chứng về tranh chấp Gate, lỗi bảo trì hoặc nhu cầu tác vụ nền; cần kịch bản riêng nếu chọn các bài toán đó. Nguyên nhân lỗi 502 chưa được xác định.
 
-## 6. Pha 2: triển khai và đối chứng
+## 6. 1 số vấn đề hiện tại
 
-| Ưu tiên / bản | Thực hiện | Điều kiện và kiểm chứng |
-| --- | --- | --- |
-| P0 / B0: cơ sở có đo đạc | Giữ chức năng pha 1, bổ sung cùng công cụ theo dõi dùng cho các bản sau; cố định hồ sơ phép đo và ghi riêng chi phí công cụ nếu ảnh hưởng đáng kể | Chạy lại được phiên bản cơ sở, có thống kê từng API, tổng số yêu cầu và từng loại lỗi ở mức 500; xác định hoặc khoanh vùng nguyên nhân tăng độ trễ/nguồn 502 theo mục 5.3 |
-| P1 / B1: truy vấn DB | Query port/adapter nhận bộ lọc/trang, lọc/sắp xếp/phân trang/đếm tại DB, projection trường cần trả; kiểm tra kế hoạch trước/sau index | Giữ phép tìm biển số chứa chuỗi, thứ tự và metadata phân trang; đo SQL/số dòng/bộ nhớ/p95; giữ giao dịch Gate và bảo vệ mật khẩu |
-| P2 / B2: cache đọc chỗ | Chỉ thử sau B1 nếu truy vấn lặp còn tốn đáng kể; so sánh bật/tắt cùng dữ liệu/tải | Đo cache hit, số truy vấn, p95, độ trễ cập nhật; chỉ giữ khi lợi ích đáp ứng nhất quán |
-| P3 / B3: tải cao | Nếu nghẽn tunnel/proxy, sửa đường đo rồi đo lại; nghẽn DB thì sửa truy vấn/kết nối; nếu nghẽn backend, kiểm tra hàng chờ/giới hạn yêu cầu; khi cần mở rộng backend hoặc chịu lỗi tiến trình, thử hai backend stateless sau cân bằng tải, chung PostgreSQL | Định tuyến theo health, ngừng nhận và xử lý yêu cầu đang chạy trước dừng; không tăng tổng tài nguyên/pool; tách lỗi hạ tầng với backend bằng log |
-
-B2: chốt mức chậm cập nhật được phép, làm mới sau commit, giới hạn thời gian lưu khi bỏ lỡ cập nhật; nhiều backend phải đồng bộ hoặc giới hạn độ cũ cache. Kiểm tra sau ENTRY/EXIT/bật-tắt bảo trì; quyết định cấp chỗ, ACTIVE và replay vẫn đối chiếu PostgreSQL.
-
-B3: migration/bootstrap Admin một lần, các backend chung JWT/API key. Chỉ thử lỗi tiến trình/container trên H1; chưa chứng minh mất toàn máy/mạng hoặc failover DB. Vi dịch vụ/outbox/worker chỉ nghiên cứu khi có nhu cầu triển khai độc lập/tác vụ mới; chưa có kịch bản chứng minh lợi ích.
-
-Nếu sửa cơ chế ghi, cache hoặc thêm backend, bổ sung Gate/bảo trì; sửa bảo trì bằng conditional update/khóa trong giao dịch. Kiểm tra cấp chỗ bảo trì, ACTIVE trùng và replay sai theo M5.
-
-Mỗi bản có tệp triển khai riêng, lệnh build/chạy/health/quay về B0. Bàn giao mã nguồn, script, snapshot khôi phục, cấu hình môi trường, log/số liệu thô và bảng trước/sau; ghi lý do giữ/loại giải pháp, chi phí tài nguyên/độ phức tạp/phạm vi kết luận, kể cả bản không đạt. Mỗi thay đổi phải có phép thử phù hợp.
-
-
+| Vấn đề | Hướng cải tiến dự kiến |
+|---|---|
+| Throughput bão hòa khoảng 14,6 req/s | Xác định và xử lý điểm nghẽn tài nguyên dùng chung (CPU, database connection pool, worker threads). |
+| `GET /parking-spots` phản hồi chậm | Tối ưu luồng đọc dữ liệu, truy vấn database, phân trang và cân nhắc Cache-Aside. |
+| Latency tăng mạnh khi tăng Virtual Users | Giảm thời gian chờ tài nguyên, nghiên cứu Bulkhead Pattern. |
+| Tỷ lệ lỗi cao ở mức 500 VU | Kiểm soát quá tải, giới hạn request đồng thời và cấu hình timeout phù hợp. |
+| Khó thay đổi thuật toán phân bổ chỗ | Áp dụng Strategy Pattern để tách biệt các chiến lược phân bổ chỗ đỗ. |
+| Sự kiện từ cổng bị gửi trùng | Cải thiện Reliability, cơ chế idempotency và khả năng phục hồi khi mất phản hồi. |
+| Race Condition khi hai xe cùng tranh một chỗ | Sử dụng transaction, row-level locking, unique constraints và idempotency để đảm bảo tính nhất quán dữ liệu. |
 
 
 ## 7. Quy ước và tài liệu
