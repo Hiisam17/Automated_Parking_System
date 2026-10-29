@@ -1,0 +1,21 @@
+=== Backend and PostgreSQL host ===
+Deployment confirmed by user: Backend and PostgreSQL run on Lenovo Legion 5 Pro 2022.
+Load generator location: Kaggle; requests reach the backend through an SSH tunnel.
+
+=== Current project machine snapshot ===
+Snapshot date: 2026-10-29 (Asia/Bangkok)
+Source: Windows CIM on the machine where the project is open.
+Manufacturer: LENOVO
+System model: 82S0
+CPU: 12th Gen Intel(R) Core(TM) i7-12700H
+CPU cores: 14
+Logical processors: 20
+Installed RAM (GiB): 16
+System-reported physical RAM (GiB): 15.80
+OS: Microsoft Windows 11 Home
+OS version: 10.0.26200
+OS architecture: 64-bit
+
+The snapshot describes the current machine. Application/container resource limits,
+JVM/PostgreSQL runtime settings, and their values during the earlier load test
+have not been recorded in the supplied report.

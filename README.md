@@ -1,6 +1,3 @@
-# Automated Parking System
-
-Backend Java/Spring Boot cho một bãi đỗ xe: nhận sự kiện vào/ra, phân chỗ, quản lý phiên gửi xe và API quản trị. Pha 1 là phiên bản cơ sở; pha 2 chọn, triển khai và đánh giá cải tiến trên cùng một cấu hình phần cứng.
 
 ## 1. Phạm vi và đặc tả
 
@@ -256,19 +253,7 @@ Sau mục 3.1, chuẩn bị API key và Admin trong `.env`:
 6. GET chỗ/phiên trả `200`; tra `sessionId` từ ENTRY, xác nhận COMPLETED sau EXIT.
 7. Bật/kết thúc bảo trì một chỗ trống; lặp kết thúc để kiểm tra tính gửi lại. Thử các nhánh từ chối theo bảng lỗi mục 1.2.
 
-## 5. Đánh giá và kết quả tải
-
-### 5.1. Hạn chế từ mã nguồn
-
-| Thuộc tính | Hạn chế cần kiểm chứng | File liên quan|
-| --- | --- | --- |
-| Toàn vẹn dữ liệu | Rủi ro bảo trì đồng thời ở mục 2.2 | `ParkingSpotAdminService`, `ParkingSpotRepositoryAdapter` |
-| Hiệu năng đọc | Hai service Admin dùng `findAll()`, lọc/sắp xếp/phân trang trong bộ nhớ; chi phí theo tổng bản ghi | `ParkingSpotAdminService`, `ParkingSessionAdminService` |
-| Hiệu năng ghi | Cấp chỗ theo mã đầu tiên, chờ khóa có thể tăng khi nhiều cổng vào | Workflow JDBC ở mục 2.1 |
-| Sửa đổi/kiểm thử | Chưa đo phạm vi thay đổi, phụ thuộc chức năng khi mở rộng một project | `api`, `business`, `infrastructure` |
-| Bảo mật/API | Các cổng chung khóa, chưa giới hạn tần suất; lỗi JWT/phân quyền/bind dữ liệu chưa thống nhất | `SecurityConfiguration`, `GateApiKeyAuthenticationFilter`, `GlobalExceptionHandler` |
-| Sẵn sàng/phục hồi | Backend và DB đều là điểm lỗi đơn; chưa kiểm chứng failover/sao lưu-khôi phục | `docker-compose.yml`, `application.yml` |
-
+## 5. Kết quả kiểm thử tải
 ### 5.2. Môi trường và số liệu Kaggle
 
 
@@ -348,10 +333,6 @@ Từ 50 lên 200 người dùng: tải ×4, thông lượng chỉ +0,15% (giá t
 
 ## 6. Pha 2: triển khai và đối chứng
 
-### 6.1. Phiên bản và điều kiện lựa chọn
-
-Giữ đơn khối phân lớp, tách truy vấn Admin với giao dịch Gate để cải thiện tra cứu, quan sát và phục hồi tải cao. Dùng các phiên bản sau để tách tác động từng thay đổi; tiêu chí định lượng ở mục 6.4.
-
 | Ưu tiên / bản | Thực hiện | Điều kiện và kiểm chứng |
 | --- | --- | --- |
 | P0 / B0: cơ sở có đo đạc | Giữ chức năng pha 1, bổ sung cùng công cụ theo dõi dùng cho các bản sau; cố định hồ sơ phép đo và ghi riêng chi phí công cụ nếu ảnh hưởng đáng kể | Chạy lại được phiên bản cơ sở, có thống kê từng API, tổng số yêu cầu và từng loại lỗi ở mức 500; xác định hoặc khoanh vùng nguyên nhân tăng độ trễ/nguồn 502 theo mục 5.3 |
@@ -368,21 +349,6 @@ Nếu sửa cơ chế ghi, cache hoặc thêm backend, bổ sung Gate/bảo trì
 Mỗi bản có tệp triển khai riêng, lệnh build/chạy/health/quay về B0. Bàn giao mã nguồn, script, snapshot khôi phục, cấu hình môi trường, log/số liệu thô và bảng trước/sau; ghi lý do giữ/loại giải pháp, chi phí tài nguyên/độ phức tạp/phạm vi kết luận, kể cả bản không đạt. Mỗi thay đổi phải có phép thử phù hợp.
 
 
-Thêm cache/proxy/backend phải chia lại cùng tổng CPU/RAM trên Lenovo, tính cả thành phần mới và giữ tổng giới hạn kết nối DB. Chỉ đổi tham số thuộc giải pháp đánh giá. Nếu đổi đường truy cập/kịch bản, chạy lại B0 trước đối chứng; không gộp tăng phần cứng, đổi dữ liệu/đường mạng vào lợi ích kiến trúc.
-
-### 6.2. Kịch bản và quy trình
-
-Tái lập nguồn phải dùng đúng script, mức tải/spawn rate/thời lượng ở mục 5.2; chưa có script thì ghi là kịch bản mới. Đối chứng đề xuất: làm nóng 60 giây, đo 5 phút mỗi mức, lặp ít nhất 3 lần; chạy lại B0 rồi dùng nguyên cấu hình cho bản sau. Khôi phục dữ liệu giữa lần đo, chạy xen kẽ, báo cáo từng lần/trung vị/min–max; không lấy trung bình p95 làm p95 gộp.
-
-| Kịch bản | Cấu hình và số liệu |
-| --- | --- |
-| M1: đọc Admin | JWT trước đo; đề xuất 70% GET chỗ / 30% GET phiên, không khẳng định script gốc. Giữ bộ lọc, trang truy vấn và khoảng nghỉ; đo p50/p95/p99, yêu cầu thành công/giây, lỗi, số câu SQL, thời gian truy vấn, tài nguyên và hàng chờ |
-| M2: login | Đo riêng đợt login cùng mức đồng thời, dữ liệu tài khoản và chính sách chờ/retry; giữ bảo vệ mật khẩu |
-| M3: dữ liệu/cache | Snapshot cố định, thêm lịch sử lớn nếu chọn tăng dữ liệu; khi cache có ENTRY/EXIT/bảo trì và đọc sau commit. Xác minh kết quả lọc/phân trang và độ mới dữ liệu; đo tỷ lệ truy cập cache thành công, số truy vấn và độ trễ cập nhật. Kích thước dữ liệu của báo cáo gốc chưa được xác nhận |
-| M4: quá tải/phục hồi | Chạy 200/500 rồi hạ về 25, cùng timeout/retry/đường truy cập/thời gian quan sát; ghi tổng/thành công, 502/HTTP 0/timeout, thời gian trở về p95/tỷ lệ lỗi mức 25, không restart ngoài kế hoạch |
-| M5: ghi/lỗi tiến trình | ENTRY → EXIT theo sức chứa seed ở mục 2.3, tránh chỉ đo hết chỗ; tranh chấp biển số/chỗ/bảo trì. Với B3, dừng một backend cùng mốc; kiểm tra transaction, replay, phiên ACTIVE trùng, trạng thái chỗ và yêu cầu gián đoạn; ghi N lượt thử và cách phát hiện vi phạm |
-
-Phân tách kết quả thành bốn nhóm: thành công, lỗi kỹ thuật, từ chối nghiệp vụ (bao gồm cả mã 409 nằm trong kỳ vọng) và từ chối do giới hạn tải. Báo cáo số lượng yêu cầu bị từ chối cùng thông lượng của các yêu cầu thành công (goodput). Các phản hồi từ chối trả về nhanh không được tính là cải thiện thời gian xử lý của yêu cầu thành công, vì vậy cần đo riêng độ trễ của yêu cầu thành công và yêu cầu thất bại. Đồng thời, kiểm tra nội dung phản hồi (response body) và các bất biến (invariant) để phát hiện trường hợp chấp nhận sai hoặc từ chối sai.
 
 
 ## 7. Quy ước và tài liệu
